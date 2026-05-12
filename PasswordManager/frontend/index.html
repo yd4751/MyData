@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Password Manager</h1>
+        
+        <div class="entry-form">
+            <h2>Add/Edit Entry</h2>
+            <form id="entryForm">
+	                <input type="text" id="title" placeholder="Title" required>
+	                <input type="text" id="username" placeholder="Username" required>
+		                <input type="text" id="password" placeholder="Password" required>
+	                <textarea id="remark" placeholder="Remark"></textarea>
+                <button type="submit">Save</button>
+            </form>
+        </div>
+
+        <div class="entry-list">
+            <h2>Password Entries</h2>
+            <table id="entriesTable">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Username</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Entries will be populated here -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="operation-logs">
+            <h2>Operation Logs</h2>
+            <table id="logsTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Operation</th>
+                        <th>Entry</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Logs will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
