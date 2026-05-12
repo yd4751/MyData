@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件传输服务器</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-cloud-upload-alt"></i> 文件传输服务器</h1>
+            <p>支持HTTP/HTTPS，可直接上传文件或目录</p>
+        </header>
+
+        <div class="upload-section">
+            <h2><i class="fas fa-upload"></i> 上传文件</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <input type="file" id="fileInput" name="file" multiple>
+                    <label for="fileInput" class="file-label">
+                        <i class="fas fa-folder-open"></i> 选择文件
+                    </label>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> 上传文件
+                    </button>
+                </div>
+            </form>
+
+            <h2><i class="fas fa-folder"></i> 上传目录</h2>
+            <form id="uploadDirForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <input type="file" id="dirInput" name="files" multiple webkitdirectory directory>
+                    <label for="dirInput" class="file-label">
+                        <i class="fas fa-folder"></i> 选择目录
+                    </label>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> 上传目录
+                    </button>
+                </div>
+            </form>
+
+            <h2><i class="fas fa-folder-plus"></i> 创建目录</h2>
+            <form id="createDirForm">
+                <div class="form-group">
+                    <input type="text" id="dirName" placeholder="输入目录名称" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-plus"></i> 创建目录
+                    </button>
+                </div>
+            </form>
+
+            <h2><i class="fas fa-tachometer-alt"></i> 网络测速</h2>
+            <div class="form-group">
+                <button id="speedTestBtn" class="btn btn-info">
+                    <i class="fas fa-bolt"></i> 开始测速
+                </button>
+                <div id="speedTestResult" style="margin-top: 10px; display: none;">
+                    <p>测速结果: <span id="bandwidthValue">0</span> Mbps</p>
+                    <p>带宽限制(80%): <span id="bandwidthLimitValue">0</span> Mbps</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="file-list-section">
+            <h2><i class="fas fa-list"></i> 文件列表</h2>
+            <div class="path-nav">
+                <span class="path-item" data-path="">根目录</span>
+            </div>
+            <div id="fileList" class="file-list">
+                <!-- 文件列表将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <footer>
+            <p>服务器运行在: <span id="serverInfo">加载中...</span></p>
+            <p>当前时间: <span id="currentTime"></span></p>
+        </footer>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

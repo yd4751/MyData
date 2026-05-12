@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资源管理存储站</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary-color: #7209b7;
+            --success-color: #4cc9f0;
+            --light-bg: #f8f9fa;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --card-shadow-hover: 0 15px 40px rgba(0, 0, 0, 0.12);
+            --transition: all 0.3s ease;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .navbar-brand i {
+            font-size: 1.8rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-bottom: 25px;
+            background: white;
+        }
+        
+        .card:hover {
+            box-shadow: var(--card-shadow-hover);
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 16px 16px 0 0 !important;
+            padding: 1.2rem 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border: none;
+        }
+        
+        .card-header i {
+            margin-right: 10px;
+        }
+        
+        .card-body {
+            padding: 1.8rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(90deg, var(--primary-dark) 0%, #5a08a1 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.4);
+        }
+        
+        .btn-outline-primary {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            border-radius: 10px;
+            transition: var(--transition);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+        
+        .btn-outline-danger {
+            border-radius: 10px;
+            transition: var(--transition);
+        }
+        
+        .btn-outline-danger:hover {
+            transform: translateY(-2px);
+        }
+        
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 16px;
+            transition: var(--transition);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        
+        .nav-tabs .nav-link {
+            border-radius: 10px 10px 0 0;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+        
+        .nav-tabs .nav-link.active {
+            background-color: rgba(67, 97, 238, 0.1);
+            border-color: #dee2e6 #dee2e6 white;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .upload-area {
+            border: 3px dashed var(--primary-color);
+            border-radius: 16px;
+            padding: 60px 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            cursor: pointer;
+            margin-bottom: 25px;
+            transition: var(--transition);
+        }
+        
+        .upload-area:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            border-color: var(--secondary-color);
+            transform: scale(1.01);
+        }
+        
+        .upload-area i {
+            font-size: 64px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            transition: var(--transition);
+        }
+        
+        .upload-area:hover i {
+            color: var(--secondary-color);
+            transform: translateY(-5px);
+        }
+        
+        .upload-area h5 {
+            color: #343a40;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area p {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+        
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table thead th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #495057;
+            padding: 1rem;
+        }
+        
+        .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .table tbody tr:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        .table-hover tbody tr:hover {
+            transform: translateX(5px);
+            transition: var(--transition);
+        }
+        
+        .pagination .page-link {
+            border-radius: 8px;
+            margin: 0 4px;
+            border: none;
+            color: var(--primary-color);
+            transition: var(--transition);
+        }
+        
+        .pagination .page-link:hover {
+            background-color: rgba(67, 97, 238, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+        }
+        
+        .progress {
+            height: 12px;
+            border-radius: 10px;
+            background-color: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--success-color) 0%, #4895ef 100%);
+            border-radius: 10px;
+        }
+        
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 16px 16px 0 0;
+            border: none;
+        }
+        
+        .modal-title {
+            font-weight: 600;
+        }
+        
+        .toast {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+        
+        .toast-header {
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .file-item {
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: white;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+        
+        .file-item:hover {
+            background-color: #f8f9fa;
+            border-color: var(--primary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-icon {
+            font-size: 28px;
+            margin-right: 15px;
+            color: var(--primary-color);
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: #343a40;
+            margin-bottom: 5px;
+        }
+        
+        .file-meta {
+            display: flex;
+            gap: 15px;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .login-container {
+            max-width: 450px;
+            margin: 80px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+        }
+        
+        @media (max-width: 768px) {
+            .card-body {
+                padding: 1.2rem;
+            }
+            
+            .upload-area {
+                padding: 40px 20px;
+            }
+            
+            .upload-area i {
+                font-size: 48px;
+            }
+            
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+        }
+        
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* 加载动画 */
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, var(--primary-dark) 0%, #5a08a1 100%);
+        }
+        
+        /* 文件预览样式 */
+        .file-preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .file-preview-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .file-preview-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            transform: translateY(-3px);
+        }
+        
+        .file-preview-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .file-preview-thumbnail-container {
+            width: 120px;
+            height: 120px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            overflow: hidden;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .file-preview-thumbnail {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .file-preview-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            border: 2px dashed #dee2e6;
+            font-size: 48px;
+            color: var(--primary-color);
+        }
+        
+        .file-preview-info {
+            width: 100%;
+        }
+        
+        .file-preview-name {
+            font-weight: 600;
+            color: #343a40;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-preview-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .file-preview-type {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary-color);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+        }
+        
+        .file-preview-size {
+            color: #6c757d;
+        }
+        
+        .file-preview-remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            opacity: 0.7;
+            transition: var(--transition);
+        }
+        
+        .file-preview-remove:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        @media (max-width: 768px) {
+            .file-preview-container {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 10px;
+            }
+            
+            .file-preview-thumbnail-container,
+            .file-preview-icon {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .file-preview-icon {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-cloud-arrow-up-fill"></i> 资源管理存储站
+            </a>
+            <div class="navbar-nav ms-auto" id="auth-buttons">
+                <!-- 登录/注册按钮将由JavaScript动态生成 -->
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <div class="container mt-4" id="main-content">
+        <!-- 登录/注册表单 -->
+        <div id="auth-forms" class="d-none">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <ul class="nav nav-tabs card-header-tabs" id="auth-tabs">
+                                <li class="nav-item">
+                                    <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login">登录</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register">注册</button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body">
+                            <div class="tab-content">
+                                <!-- 登录表单 -->
+                                <div class="tab-pane fade show active" id="login">
+                                    <form id="login-form">
+                                        <div class="mb-3">
+                                            <label for="login-username" class="form-label">用户名</label>
+                                            <input type="text" class="form-control" id="login-username" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="login-password" class="form-label">密码</label>
+                                            <input type="password" class="form-control" id="login-password" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                                    </form>
+                                </div>
+                                <!-- 注册表单 -->
+                                <div class="tab-pane fade" id="register">
+                                    <form id="register-form">
+                                        <div class="mb-3">
+                                            <label for="register-username" class="form-label">用户名</label>
+                                            <input type="text" class="form-control" id="register-username" required minlength="3" maxlength="50">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="register-email" class="form-label">邮箱</label>
+                                            <input type="email" class="form-control" id="register-email" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="register-password" class="form-label">密码</label>
+                                            <input type="password" class="form-control" id="register-password" required minlength="6">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">注册</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 资源管理界面 -->
+        <div id="resource-manager" class="d-none">
+            <div class="row">
+                <div class="col-md-3">
+                    <!-- 用户信息侧边栏 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-person-circle"></i> 用户信息
+                        </div>
+                        <div class="card-body">
+                            <div id="user-info">
+                                <!-- 用户信息将由JavaScript动态生成 -->
+                            </div>
+                            <button class="btn btn-outline-danger w-100 mt-3" id="logout-btn">
+                                <i class="bi bi-box-arrow-right"></i> 退出登录
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 上传面板 -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <i class="bi bi-upload"></i> 上传文件
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" id="upload-area">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                                <h5>拖放文件到此处或点击选择</h5>
+                                <p class="text-muted">支持文本、图片、视频、音频等文件</p>
+                                <input type="file" id="file-input" class="d-none" multiple>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="is-public">
+                                <label class="form-check-label" for="is-public">
+                                    设为公开
+                                </label>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="file-description" class="form-label">文件描述</label>
+                                <textarea class="form-control" id="file-description" rows="2" placeholder="可选的文件描述"></textarea>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="file-tags" class="form-label">标签</label>
+                                <input type="text" class="form-control" id="file-tags" placeholder="用逗号分隔的标签">
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="enable-chunking">
+                                <label class="form-check-label" for="enable-chunking">
+                                    启用分片上传（大文件推荐）
+                                </label>
+                            </div>
+                            <button class="btn btn-primary w-100" id="start-upload">
+                                <i class="bi bi-upload"></i> 开始上传
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-9">
+                    <!-- 资源列表 -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-folder"></i> 我的资源</span>
+                            <div>
+                                <input type="text" class="form-control form-control-sm" id="search-input" placeholder="搜索资源..." style="width: 200px; display: inline-block;">
+                                <button class="btn btn-sm btn-outline-primary ms-2" id="refresh-btn">
+                                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>文件名</th>
+                                            <th>类型</th>
+                                            <th>大小</th>
+                                            <th>状态</th>
+                                            <th>上传时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="resource-table">
+                                        <!-- 资源列表将由JavaScript动态生成 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <nav aria-label="资源分页">
+                                <ul class="pagination justify-content-center" id="pagination">
+                                    <!-- 分页将由JavaScript动态生成 -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+
+                    <!-- 上传进度 -->
+                    <div class="card mt-3" id="upload-progress-card" style="display: none;">
+                        <div class="card-header">
+                            <i class="bi bi-clock-history"></i> 上传进度
+                        </div>
+                        <div class="card-body">
+                            <div id="upload-progress">
+                                <!-- 上传进度将由JavaScript动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 资源详情 -->
+    <div class="modal fade" id="resource-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">资源详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="resource-details">
+                    <!-- 资源详情将由JavaScript动态生成 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="download-btn">
+                        <i class="bi bi-download"></i> 下载
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <!-- 自定义JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
