@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -25,16 +26,16 @@ type Entry struct {
 
 // Log represents an operation log
 type Log struct {
-	ID           int       `json:"id"`
-	EntryID      int       `json:"entry_id"`
-	OperationType string   `json:"operation_type"`
+	ID            int       `json:"id"`
+	EntryID       int       `json:"entry_id"`
+	OperationType string    `json:"operation_type"`
 	OperationTime time.Time `json:"operation_time"`
-	UserID       int       `json:"user_id"`
+	UserID        int       `json:"user_id"`
 }
 
 func initDB() {
 	var err error
-	db, err = sql.Open("mysql", "root:password@tcp(127.0.0.1:3306)/password_manager")
+	db, err = sql.Open("mysql", "root:12345678@tcp(localhost:3306)/password_manager?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,7 +56,39 @@ func main() {
 	http.HandleFunc("/api/password_entries/", entryHandler)
 	http.HandleFunc("/api/operation_logs", logsHandler)
 
-	log.Println("Starting server on :8080")
+		// Serve static files from the correct path
+		frontendPath := filepath.Join(".", "..", "frontend")
+		absPath, _ := filepath.Abs(frontendPath)
+		log.Println("Serving static files from:", absPath)
+		
+		// Check if frontend directory exists and is readable
+		if _, err := os.Stat(frontendPath); os.IsNotExist(err) {
+			log.Fatal("Frontend directory not found:", frontendPath)
+		}
+		if _, err := os.Stat(filepath.Join(frontendPath, "index.html")); os.IsNotExist(err) {
+			log.Fatal("index.html not found in frontend directory")
+		}
+
+		// Create file server with logging
+		fs := http.FileServer(http.Dir(frontendPath))
+		
+		// Handle all routes by first trying static files, then falling back to index.html
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			// Log the requested path
+			log.Printf("Request path: %s", r.URL.Path)
+			
+			// Try to serve static file
+			if _, err := os.Stat(filepath.Join(frontendPath, r.URL.Path)); os.IsNotExist(err) {
+				// If file doesn't exist, serve index.html for SPA routing
+				http.ServeFile(w, r, filepath.Join(frontendPath, "index.html"))
+				return
+			}
+			
+			// Otherwise serve the static file
+			http.StripPrefix("/", fs).ServeHTTP(w, r)
+		})
+
+		log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
