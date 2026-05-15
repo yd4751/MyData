@@ -81,23 +81,26 @@ func LoadConfig(configPath string) error {
 		return fmt.Errorf("获取配置文件绝对路径失败: %v", err)
 	}
 
-	viper.SetConfigFile(absPath)
-	viper.SetConfigType("yaml")
-
-	// 设置环境变量前缀
-	viper.SetEnvPrefix("RS")
-	viper.AutomaticEnv()
-
-	// 读取配置文件
-	if err := viper.ReadInConfig(); err != nil {
+	// 直接读取JSON文件
+	data, err := os.ReadFile(absPath)
+	if err != nil {
 		return fmt.Errorf("读取配置文件失败: %v", err)
 	}
 
-	// 解析配置到结构体
+	// 解析JSON到结构体
 	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
+	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("解析配置文件失败: %v", err)
 	}
+
+	// 转换配置结构以匹配原有格式
+	config.Server.Host = "0.0.0.0"
+	config.Server.Port = config.Backend.Port
+	config.Database.Host = config.Database.Host
+	config.Database.Port = config.Database.Port
+	config.Database.Username = config.Database.User
+	config.Database.Password = config.Database.Password
+	config.Database.Database = config.Database.Name
 
 	AppConfig = &config
 	log.Printf("配置文件加载成功: %s", absPath)

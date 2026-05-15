@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -19,9 +18,6 @@ import (
 // 配置结构体
 type Config struct {
 	HTTPPort  string `json:"http_port"`
-	HTTPSPort string `json:"https_port"`
-	TLSCert   string `json:"tls_cert"`
-	TLSKey    string `json:"tls_key"`
 	UploadDir string `json:"upload_dir"`
 	StaticDir string `json:"static_dir"`
 }
@@ -80,35 +76,39 @@ func main() {
 	mux.HandleFunc("/api/create-dir", handleCreateDir)
 	mux.HandleFunc("/api/speedtest", handleSpeedTest)
 
-	// 启动HTTP服务器(暂时只开http)
-	startHTTPServer(mux)
-
-	// 启动HTTPS服务器
-	//startHTTPSServer(mux)
+		// 启动HTTP服务器
+		startHTTPServer(mux)
 }
 
 func loadConfig() {
 	// 默认配置
 	config = Config{
 		HTTPPort:  "7051",
-		HTTPSPort: "8443",
-		TLSCert:   "cert.pem",
-		TLSKey:    "key.pem",
 		UploadDir: "uploads",
 		StaticDir: "static",
 	}
 
 	// 尝试从配置文件加载
-	configFile := "config.json"
+	configFile := "../config.json"
 	if _, err := os.Stat(configFile); err == nil {
 		data, err := os.ReadFile(configFile)
 		if err == nil {
-			json.Unmarshal(data, &config)
+			var fullConfig struct {
+				Backend struct {
+					Port      string `json:"port"`
+					UploadDir string `json:"upload_dir"`
+					StaticDir string `json:"static_dir"`
+				}
+			}
+			json.Unmarshal(data, &fullConfig)
+			config.HTTPPort = fullConfig.Backend.Port
+			uploadDir = fullConfig.Backend.UploadDir
+			staticDir = fullConfig.Backend.StaticDir
 		}
+	} else {
+		uploadDir = config.UploadDir
+		staticDir = config.StaticDir
 	}
-
-	uploadDir = config.UploadDir
-	staticDir = config.StaticDir
 }
 
 func createDirectories() {
@@ -229,37 +229,6 @@ func startHTTPServer(mux http.Handler) {
 	err := http.ListenAndServe(":"+config.HTTPPort, mux)
 	if err != nil {
 		log.Fatalf("HTTP服务器启动失败: %v", err)
-	}
-}
-
-func startHTTPSServer(mux http.Handler) {
-	// 检查TLS证书是否存在
-	if _, err := os.Stat(config.TLSCert); os.IsNotExist(err) {
-		log.Printf("TLS证书不存在，HTTPS服务器将不会启动")
-		log.Printf("要启用HTTPS，请创建证书: %s 和 %s", config.TLSCert, config.TLSKey)
-		return
-	}
-
-	if _, err := os.Stat(config.TLSKey); os.IsNotExist(err) {
-		log.Printf("TLS密钥不存在，HTTPS服务器将不会启动")
-		return
-	}
-
-	// 配置TLS
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-
-	server := &http.Server{
-		Addr:      ":" + config.HTTPSPort,
-		Handler:   mux,
-		TLSConfig: tlsConfig,
-	}
-
-	log.Printf("HTTPS服务器启动在 :%s", config.HTTPSPort)
-	err := server.ListenAndServeTLS(config.TLSCert, config.TLSKey)
-	if err != nil {
-		log.Fatalf("HTTPS服务器启动失败: %v", err)
 	}
 }
 

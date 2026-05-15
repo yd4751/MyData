@@ -1,14 +1,17 @@
 {
-  "http_port": "7051",
-  "https_port": "8443",
-  "tls_cert": "cert.pem",
-  "tls_key": "key.pem",
-  "upload_dir": "uploads",
-  "static_dir": "static",
-  "max_upload_size_mb": 100,
-  "enable_cors": true,
-  "allow_file_types": ["*"],
-  "require_auth": false,
-  "auth_username": "admin",
-  "auth_password": "password"
+  "backend": {
+    "port": 7054,
+    "command": "go run main.go",
+    "upload_dir": "uploads",
+    "static_dir": "static",
+    "max_upload_size_mb": 100,
+    "enable_cors": true,
+    "allow_file_types": ["*"],
+    "require_auth": false,
+    "auth_username": "admin",
+    "auth_password": "password"
+  },
+  "frontend": {
+    "url": "http://localhost:7051"
+  }
 }
