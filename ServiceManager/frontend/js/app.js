@@ -51,10 +51,47 @@ function renderServices() {
                 <button class="button ${service.status === 'running' ? 'stop-btn' : 'start-btn'}" data-id="${service.id}">
                     ${service.status === 'running' ? '停止' : '启动'}
                 </button>
+                <button class="button edit-btn" data-id="${service.id}">编辑</button>
                 <button class="button delete-btn" data-id="${service.id}">删除</button>
             </div>
         `;
+        
+        // 添加卡片点击事件
+        card.addEventListener('click', (e) => {
+            // 如果点击的是按钮，则不显示详情
+            if (e.target.tagName === 'BUTTON') return;
+            showServiceDetails(service);
+        });
+        
         servicesContainer.appendChild(card);
+    });
+}
+
+// 显示服务详情
+function showServiceDetails(service) {
+    const modal = document.getElementById('service-modal');
+    const modalContent = document.getElementById('modal-content');
+    const modalTitle = document.getElementById('modal-title');
+    
+    modalTitle.textContent = service.name;
+    modalContent.innerHTML = `
+        <div class="service-details">
+            <p><strong>服务ID:</strong> ${service.id}</p>
+            <p><strong>状态:</strong> <span class="status-badge ${service.status}">${service.status === 'running' ? '运行中' : '已停止'}</span></p>
+            <p><strong>启动时间:</strong> ${service.startTime?.Valid ? new Date(service.startTime.Time).toLocaleString('zh-CN') : '-'}</p>
+            <p><strong>运行时长:</strong> ${service.uptime?.Valid ? service.uptime.String : '-'}</p>
+            <p><strong>命令:</strong> ${service.command}</p>
+            ${service.url ? `<p><strong>URL:</strong> <a href="${service.url}" target="_blank">${service.url}</a></p>` : ''}
+            <p><strong>创建时间:</strong> ${new Date(service.createdAt).toLocaleString('zh-CN')}</p>
+            ${service.updatedAt ? `<p><strong>更新时间:</strong> ${new Date(service.updatedAt).toLocaleString('zh-CN')}</p>` : ''}
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+    
+    // 添加关闭按钮事件
+    document.querySelector('#service-modal .close').addEventListener('click', () => {
+        modal.style.display = 'none';
     });
 }
 
@@ -88,6 +125,8 @@ function setupEventListeners() {
             if (confirm('确定要删除此服务吗？')) {
                 deleteService(e.target.dataset.id);
             }
+        } else if (e.target.classList.contains('edit-btn')) {
+            editService(e.target.dataset.id);
         }
     });
 
@@ -124,7 +163,9 @@ function setupEventListeners() {
         if (file) {
             try {
                 const content = await readFileAsText(file);
+                console.log('文件内容:', content);
                 jsonInput.value = content;
+                console.log('jsonInput值已设置');
             } catch (error) {
                 console.error('读取文件失败:', error);
                 alert('读取文件失败，请检查文件格式');
@@ -188,7 +229,7 @@ async function importServices(json) {
         return await response.json();
     } catch (error) {
         console.error('导入服务失败:', error);
-        throw error;
+        throw new Error(`导入失败: ${error.message}. 请检查JSON格式是否正确`);
     }
 }
 
@@ -229,6 +270,110 @@ async function stopService(serviceId) {
         fetchServices(); // 刷新服务列表
     } catch (error) {
         console.error('停止服务失败:', error);
+    }
+}
+
+// 编辑服务
+async function editService(serviceId) {
+    try {
+        // 获取服务详情
+        const response = await fetch(`${apiBaseUrl}/services`);
+        const services = await response.json();
+        const service = services.find(s => s.id == serviceId);
+        
+        if (!service) {
+            throw new Error('Service not found');
+        }
+
+        // 创建编辑表单模态框
+        const editModal = document.createElement('div');
+        editModal.className = 'modal';
+        editModal.id = 'edit-service-modal';
+        editModal.innerHTML = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>编辑服务</h2>
+                <form id="edit-service-form">
+                    <input type="hidden" id="edit-service-id" value="${service.id}">
+                    <div class="form-group">
+                        <label for="edit-service-name">服务名称</label>
+                        <input type="text" id="edit-service-name" value="${service.name}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-service-status">状态</label>
+                        <select id="edit-service-status">
+                            <option value="running" ${service.status === 'running' ? 'selected' : ''}>运行中</option>
+                            <option value="stopped" ${service.status === 'stopped' ? 'selected' : ''}>已停止</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-service-url">URL</label>
+                        <input type="text" id="edit-service-url" value="${service.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-service-command">命令</label>
+                        <input type="text" id="edit-service-command" value="${service.command || ''}">
+                    </div>
+                    <button type="submit">保存</button>
+                </form>
+            </div>
+        `;
+
+        document.body.appendChild(editModal);
+        editModal.style.display = 'block';
+
+        // 关闭按钮事件
+        editModal.querySelector('.close').addEventListener('click', () => {
+            editModal.style.display = 'none';
+            editModal.remove();
+        });
+
+        // 表单提交
+        document.getElementById('edit-service-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const serviceData = {
+                id: parseInt(document.getElementById('edit-service-id').value),
+                name: document.getElementById('edit-service-name').value,
+                status: document.getElementById('edit-service-status').value,
+                url: document.getElementById('edit-service-url').value || null,
+                command: document.getElementById('edit-service-command').value || null
+            };
+
+            try {
+                await updateService(serviceData);
+                editModal.style.display = 'none';
+                editModal.remove();
+                fetchServices(); // 刷新服务列表
+            } catch (error) {
+                console.error('编辑服务失败:', error);
+                alert('编辑服务失败: ' + error.message);
+            }
+        });
+    } catch (error) {
+        console.error('获取服务详情失败:', error);
+        alert('无法编辑服务: ' + error.message);
+    }
+}
+
+// 更新服务
+async function updateService(serviceData) {
+    try {
+        const response = await fetch(`${apiBaseUrl}/services/edit`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(serviceData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '更新失败');
+        }
+    } catch (error) {
+        console.error('更新服务失败:', error);
+        throw error;
     }
 }
 

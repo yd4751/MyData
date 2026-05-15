@@ -1,0 +1,17 @@
+[
+  {
+    "name": "密码管理",
+    "command": "go run backend/main.go",
+    "url": "http://43.139.101.12:7052"
+  },
+  {
+    "name": "资源站",
+    "command": "go run backend/cmd/server/main.go",
+    "url": "http://43.139.101.12:7053"
+  },
+  {
+    "name": "文件传输服务",
+    "command": "go run main.go",
+    "url": "http://43.139.101.12:7054"
+  }
+]
