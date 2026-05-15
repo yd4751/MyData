@@ -44,15 +44,15 @@ func loadConfig() error {
 
 // Service 定义服务结构体
 type Service struct {
-	ID        int            `json:"id"`
-	Name      string         `json:"name"`
-	Status    string         `json:"status"`
-	StartTime sql.NullTime   `json:"startTime"`
-	Uptime    sql.NullString `json:"uptime"`
-	URL       sql.NullString `json:"url"`
-	Address   sql.NullString `json:"address"`
-	Command   sql.NullString `json:"command"`
-	PID       sql.NullInt64  `json:"pid"`
+	ID        int          `json:"id"`
+	Name      string       `json:"name"`
+	Status    string       `json:"status"`
+	StartTime sql.NullTime `json:"startTime"`
+	Uptime    *string      `json:"uptime"`
+	URL       *string      `json:"url"`
+	Address   *string      `json:"address"`
+	Command   *string      `json:"command"`
+	PID       *int64       `json:"pid"`
 }
 
 var db *sql.DB
@@ -100,6 +100,7 @@ func main() {
 	http.HandleFunc("/api/services/start", corsHandler(startService))
 	http.HandleFunc("/api/services/stop", corsHandler(stopService))
 	http.HandleFunc("/api/services/import", corsHandler(importServices))
+	http.HandleFunc("/api/services/edit", corsHandler(updateService))
 
 	log.Printf("Server starting on port %d...", config.Backend.Port)
 	if err := http.ListenAndServe(":"+strconv.Itoa(config.Backend.Port), nil); err != nil {
@@ -167,8 +168,35 @@ func getServices(w http.ResponseWriter, r *http.Request) {
 	var services []Service
 	for rows.Next() {
 		var s Service
-		err := rows.Scan(&s.ID, &s.Name, &s.Status, &s.StartTime, &s.Uptime,
-			&s.URL, &s.Address, &s.Command, &s.PID)
+		var name sql.NullString
+		var status sql.NullString
+		var url sql.NullString
+		var address sql.NullString
+		var command sql.NullString
+		var pid sql.NullInt64
+
+		err := rows.Scan(&s.ID, &name, &status, &s.StartTime, &s.Uptime, &url, &address, &command, &pid)
+		// 处理null值并设置默认值
+		s.Name = name.String
+		if !name.Valid {
+			s.Name = ""
+		}
+		s.Status = status.String
+		if !status.Valid {
+			s.Status = "stopped"
+		}
+		if url.Valid {
+			s.URL = &url.String
+		}
+		if address.Valid {
+			s.Address = &address.String
+		}
+		if command.Valid {
+			s.Command = &command.String
+		}
+		if pid.Valid {
+			s.PID = &pid.Int64
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -190,6 +218,60 @@ func startService(w http.ResponseWriter, r *http.Request) {
 func stopService(w http.ResponseWriter, r *http.Request) {
 	// TODO: 实现停止服务逻辑
 	w.WriteHeader(http.StatusOK)
+}
+
+// updateService 更新服务信息
+func updateService(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" && r.Method != "PATCH" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var service Service
+	err := json.NewDecoder(r.Body).Decode(&service)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// 验证必要字段
+	if service.ID == 0 {
+		http.Error(w, "Service ID is required", http.StatusBadRequest)
+		return
+	}
+	if service.Name == "" {
+		http.Error(w, "Service name is required", http.StatusBadRequest)
+		return
+	}
+
+	// 检查服务是否存在
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM services WHERE id = ?", service.ID).Scan(&count)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if count == 0 {
+		http.Error(w, "Service not found", http.StatusNotFound)
+		return
+	}
+
+	// 更新服务
+	_, err = db.Exec("UPDATE services SET name = ?, status = ?, url = ?, address = ?, command = ? WHERE id = ?",
+		service.Name,
+		service.Status,
+		toNullString(service.URL),
+		toNullString(service.Address),
+		toNullString(service.Command),
+		service.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(service)
 }
 
 // addService 添加新服务
@@ -218,10 +300,11 @@ func addService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := db.Exec("INSERT INTO services (name, status, url, address, command) VALUES (?, ?, ?, ?, ?)",
-		service.Name, service.Status,
-		sql.NullString{String: service.URL.String, Valid: service.URL.Valid},
-		sql.NullString{String: service.Address.String, Valid: service.Address.Valid},
-		sql.NullString{String: service.Command.String, Valid: service.Command.Valid})
+		service.Name,
+		service.Status,
+		toNullString(service.URL),
+		toNullString(service.Address),
+		toNullString(service.Command))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -312,10 +395,11 @@ func importServices(w http.ResponseWriter, r *http.Request) {
 		}
 
 		_, err := tx.Exec("INSERT INTO services (name, status, url, address, command) VALUES (?, ?, ?, ?, ?)",
-			service.Name, service.Status,
-			sql.NullString{String: service.URL.String, Valid: service.URL.Valid},
-			sql.NullString{String: service.Address.String, Valid: service.Address.Valid},
-			sql.NullString{String: service.Command.String, Valid: service.Command.Valid})
+			service.Name,
+			service.Status,
+			toNullString(service.URL),
+			toNullString(service.Address),
+			toNullString(service.Command))
 		if err != nil {
 			tx.Rollback()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -332,4 +416,12 @@ func importServices(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Successfully imported services"))
+}
+
+// toNullString 将*string转换为sql.NullString
+func toNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: *s, Valid: true}
 }
