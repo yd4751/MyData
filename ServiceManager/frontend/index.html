@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>服务管理平台</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 </head>
 <body>
+    <div class="background-overlay"></div>
     <div class="container">
-        <div class="header">
+        <div class="header animate__animated animate__fadeInDown">
             <h1>服务管理平台</h1>
             <div class="header-actions">
-                <button id="add-service-btn" class="button add-btn">+ 添加服务</button>
-                <button id="import-services-btn" class="button import-btn">导入服务</button>
+                <button id="add-service-btn" class="button add-btn">
+                    <i class="icon-plus"></i> 添加服务
+                </button>
+                <button id="import-services-btn" class="button import-btn">
+                    <i class="icon-import"></i> 导入服务
+                </button>
             </div>
         </div>
         <div id="services-container" class="services-grid">
