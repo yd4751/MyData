@@ -1,0 +1,17 @@
+{
+  "backend": {
+    "host": "0.0.0.0", 
+    "port": 7053,
+    "command": "go run backend/cmd/server/main.go"
+  },
+  "database": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "12345678",
+    "name": "resource_station"
+  },
+  "frontend": {
+    "url": "http://localhost"
+  }
+}

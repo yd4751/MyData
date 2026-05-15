@@ -1,0 +1,16 @@
+{
+  "backend": {
+    "port": 7052,
+    "command": "go run backend/main.go"
+  },
+  "database": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "12345678",
+    "name": "password_manager"
+  },
+  "frontend": {
+    "url": "http://localhost"
+  }
+}

@@ -6,14 +6,29 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// Config represents the application configuration
+type Config struct {
+	Backend struct {
+		Port int `json:"port"`
+	} `json:"backend"`
+	Database struct {
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		User     string `json:"user"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+	} `json:"database"`
+}
+
 // Database connection
 var db *sql.DB
+var config Config
 
 // Entry represents a password entry
 type Entry struct {
@@ -33,16 +48,18 @@ type Log struct {
 	UserID        int       `json:"user_id"`
 }
 
+func loadConfig() error {
+	configFile, err := os.ReadFile("../config.json")
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(configFile, &config)
+}
+
 func initDB() {
 	var err error
-	db, err = sql.Open("mysql", "root:12345678@tcp(localhost:3306)/password_manager?charset=utf8mb4&parseTime=True&loc=Local")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
+	dsn := config.Database.User + ":" + config.Database.Password + "@tcp(" + config.Database.Host + ":" + strconv.Itoa(config.Database.Port) + ")/" + config.Database.Name + "?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err = sql.Open("mysql", dsn)
 	}
 	log.Println("Connected to database")
 }
@@ -88,8 +105,12 @@ func main() {
 			http.StripPrefix("/", fs).ServeHTTP(w, r)
 		})
 
-		log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	if err := loadConfig(); err != nil {
+		log.Fatal("Failed to load config:", err)
+	}
+
+	log.Printf("Starting server on :%d", config.Backend.Port)
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(config.Backend.Port), nil))
 }
 
 // entriesHandler handles all password entry operations

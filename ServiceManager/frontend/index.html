@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务管理平台</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>服务管理平台</h1>
+            <div class="header-actions">
+                <button id="add-service-btn" class="button add-btn">+ 添加服务</button>
+                <button id="import-services-btn" class="button import-btn">导入服务</button>
+            </div>
+        </div>
+        <div id="services-container" class="services-grid">
+            <!-- 服务卡片将通过JS动态生成 -->
+        </div>
+
+        <!-- 添加服务表单 -->
+        <div id="add-service-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>添加新服务</h2>
+                <form id="add-service-form">
+                    <div class="form-group">
+                        <label for="service-name">服务名称</label>
+                        <input type="text" id="service-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="service-command">启动命令</label>
+                        <input type="text" id="service-command" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="service-url">前端URL</label>
+                        <input type="url" id="service-url">
+                    </div>
+                    <button type="submit" class="button submit-btn">创建服务</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入服务模态框 -->
+    <div id="import-service-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>批量导入服务</h2>
+            <div class="import-options">
+                <div class="option">
+                    <h3>上传JSON文件</h3>
+                    <input type="file" id="json-file" accept=".json">
+                </div>
+                <div class="option">
+                    <h3>或直接输入JSON</h3>
+                    <div class="json-input-container">
+                        <textarea id="json-input" placeholder="输入服务JSON数组"></textarea>
+                        <div class="json-example">
+                            <p>示例:</p>
+                            <pre>[
+  {
+    "name": "用户服务", 
+    "command": "node user-service.js",
+    "url": "http://localhost:3001"
+  },
+  {
+    "name": "订单服务",
+    "command": "node order-service.js", 
+    "url": "http://localhost:3002"
+  }
+]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="submit-import" class="button submit-btn">导入</button>
+        </div>
+    </div>
+
+    <div id="service-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modal-title">服务详情</h2>
+            <div id="modal-content">
+                <!-- 详情内容将通过JS动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
