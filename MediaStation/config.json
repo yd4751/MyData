@@ -1,0 +1,10 @@
+{
+    "port": "7055",
+    "db_host": "localhost",
+    "db_port": "3306",
+    "db_user": "root",
+    "db_password": "12345678",
+    "db_name": "mediastation",
+    "media_dir": "./media",
+    "static_dir": "./frontend"
+}

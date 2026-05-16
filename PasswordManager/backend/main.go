@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -60,6 +61,8 @@ func initDB() {
 	var err error
 	dsn := config.Database.User + ":" + config.Database.Password + "@tcp(" + config.Database.Host + ":" + strconv.Itoa(config.Database.Port) + ")/" + config.Database.Name + "?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err = sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
 	}
 	log.Println("Connected to database")
 }
@@ -73,37 +76,37 @@ func main() {
 	http.HandleFunc("/api/password_entries/", entryHandler)
 	http.HandleFunc("/api/operation_logs", logsHandler)
 
-		// Serve static files from the correct path
-		frontendPath := filepath.Join(".", "..", "frontend")
-		absPath, _ := filepath.Abs(frontendPath)
-		log.Println("Serving static files from:", absPath)
-		
-		// Check if frontend directory exists and is readable
-		if _, err := os.Stat(frontendPath); os.IsNotExist(err) {
-			log.Fatal("Frontend directory not found:", frontendPath)
-		}
-		if _, err := os.Stat(filepath.Join(frontendPath, "index.html")); os.IsNotExist(err) {
-			log.Fatal("index.html not found in frontend directory")
+	// Serve static files from the correct path
+	frontendPath := filepath.Join(".", "..", "frontend")
+	absPath, _ := filepath.Abs(frontendPath)
+	log.Println("Serving static files from:", absPath)
+
+	// Check if frontend directory exists and is readable
+	if _, err := os.Stat(frontendPath); os.IsNotExist(err) {
+		log.Fatal("Frontend directory not found:", frontendPath)
+	}
+	if _, err := os.Stat(filepath.Join(frontendPath, "index.html")); os.IsNotExist(err) {
+		log.Fatal("index.html not found in frontend directory")
+	}
+
+	// Create file server with logging
+	fs := http.FileServer(http.Dir(frontendPath))
+
+	// Handle all routes by first trying static files, then falling back to index.html
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Log the requested path
+		log.Printf("Request path: %s", r.URL.Path)
+
+		// Try to serve static file
+		if _, err := os.Stat(filepath.Join(frontendPath, r.URL.Path)); os.IsNotExist(err) {
+			// If file doesn't exist, serve index.html for SPA routing
+			http.ServeFile(w, r, filepath.Join(frontendPath, "index.html"))
+			return
 		}
 
-		// Create file server with logging
-		fs := http.FileServer(http.Dir(frontendPath))
-		
-		// Handle all routes by first trying static files, then falling back to index.html
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			// Log the requested path
-			log.Printf("Request path: %s", r.URL.Path)
-			
-			// Try to serve static file
-			if _, err := os.Stat(filepath.Join(frontendPath, r.URL.Path)); os.IsNotExist(err) {
-				// If file doesn't exist, serve index.html for SPA routing
-				http.ServeFile(w, r, filepath.Join(frontendPath, "index.html"))
-				return
-			}
-			
-			// Otherwise serve the static file
-			http.StripPrefix("/", fs).ServeHTTP(w, r)
-		})
+		// Otherwise serve the static file
+		http.StripPrefix("/", fs).ServeHTTP(w, r)
+	})
 
 	if err := loadConfig(); err != nil {
 		log.Fatal("Failed to load config:", err)

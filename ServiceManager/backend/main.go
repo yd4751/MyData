@@ -3,12 +3,16 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -18,6 +22,7 @@ type Config struct {
 	Backend struct {
 		Port    int    `json:"port"`
 		Command string `json:"command"`
+		PidFile string `json:"pid_file"`
 	} `json:"backend"`
 	Database struct {
 		Host     string `json:"host"`
@@ -78,9 +83,11 @@ func main() {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == "OPTIONS" {
+				log.Println("Handling OPTIONS preflight request")
 				w.WriteHeader(http.StatusOK)
 				return
 			}
+
 			next(w, r)
 		}
 	}
@@ -210,14 +217,134 @@ func getServices(w http.ResponseWriter, r *http.Request) {
 
 // startService 启动服务
 func startService(w http.ResponseWriter, r *http.Request) {
-	// TODO: 实现启动服务逻辑
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var service Service
+	err := json.NewDecoder(r.Body).Decode(&service)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if service.ID == 0 {
+		http.Error(w, "Service ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 从数据库获取服务命令
+	var command string
+	err = db.QueryRow("SELECT command FROM services WHERE id = ?", service.ID).Scan(&command)
+	if err != nil {
+		http.Error(w, "Failed to get service command: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if command == "" {
+		http.Error(w, "Service command is empty", http.StatusBadRequest)
+		return
+	}
+
+	// 执行命令
+	cmd := exec.Command("sh", "-c", command)
+	fmt.Printf("Starting service with command: %s", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // 创建进程组
+	err = cmd.Start()
+	if err != nil {
+		http.Error(w, "Failed to start service: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	pid := int64(cmd.Process.Pid)
+	service.PID = &pid
+	service.Status = "running"
+	service.StartTime = sql.NullTime{Time: time.Now(), Valid: true}
+
+	// 更新数据库
+	_, err = db.Exec("UPDATE services SET status = ?, start_time = ?, pid = ? WHERE id = ?",
+		service.Status,
+		service.StartTime,
+		pid,
+		service.ID)
+	if err != nil {
+		http.Error(w, "Failed to update service: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 写入PID文件
+	pidFile := config.Backend.PidFile
+	if pidFile != "" {
+		err = os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", pid)), 0644)
+		if err != nil {
+			log.Printf("Warning: failed to write PID file: %v", err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(service)
 }
 
 // stopService 停止服务
 func stopService(w http.ResponseWriter, r *http.Request) {
-	// TODO: 实现停止服务逻辑
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var service Service
+	err := json.NewDecoder(r.Body).Decode(&service)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if service.ID == 0 {
+		http.Error(w, "Service ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 从数据库获取PID
+	var pid int64
+	err = db.QueryRow("SELECT pid FROM services WHERE id = ?", service.ID).Scan(&pid)
+	if err != nil {
+		http.Error(w, "Failed to get service PID: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if pid == 0 {
+		http.Error(w, "Service is not running", http.StatusBadRequest)
+		return
+	}
+
+	// 终止进程
+	err = syscall.Kill(-int(pid), syscall.SIGTERM) // 使用负数PID终止整个进程组
+	if err != nil {
+		// 如果进程不存在，可能是已经停止
+		if !errors.Is(err, syscall.ESRCH) {
+			http.Error(w, "Failed to stop service: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 更新数据库
+	_, err = db.Exec("UPDATE services SET status = 'stopped', pid = NULL, uptime = TIMESTAMPDIFF(SECOND, start_time, NOW()) WHERE id = ?", service.ID)
+	if err != nil {
+		http.Error(w, "Failed to update service: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 删除PID文件
+	pidFile := config.Backend.PidFile
+	if pidFile != "" {
+		os.Remove(pidFile)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "stopped"})
 }
 
 // updateService 更新服务信息

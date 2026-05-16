@@ -1,0 +1,54 @@
+CREATE DATABASE IF NOT EXISTS mediastation CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE mediastation;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(255),
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS media_series (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    thumbnail VARCHAR(500),
+    media_type VARCHAR(20) NOT NULL,
+    total_episodes INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS media (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(20) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    thumbnail VARCHAR(500),
+    duration INT DEFAULT 0,
+    width INT DEFAULT 0,
+    height INT DEFAULT 0,
+    season INT DEFAULT 0,
+    episode INT DEFAULT 0,
+    series_id INT DEFAULT 0,
+    is_vertical BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_series_id (series_id)
+);
+
+CREATE TABLE IF NOT EXISTS play_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    media_id INT NOT NULL,
+    progress INT DEFAULT 0,
+    played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_media_id (media_id),
+    UNIQUE KEY unique_user_media (user_id, media_id)
+);
