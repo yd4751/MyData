@@ -993,8 +993,9 @@ function createAudioPlayerModal() {
             <div class="audio-player-container">
                 <h3 id="audioTitle"></h3>
                 <img id="audioCover" src="" alt="封面" style="max-width:200px; margin:1rem auto; display:block; border-radius:8px;">
-                <audio id="audioPlayer" controls style="width:100%; margin:1rem 0;">
+                <audio id="audioPlayer" style="display:none;">
                     <source id="audioSource" src="" type="audio/mpeg">
+                    <source id="audioSourceOgg" src="" type="audio/ogg">
                 </audio>
                 <div class="audio-controls">
                     <button id="audioPlayPauseBtn">播放</button>
@@ -1025,10 +1026,18 @@ function createAudioPlayerModal() {
     const audioProgress = document.getElementById('audioProgress');
     const audioTimeDisplay = document.getElementById('audioTimeDisplay');
     
-    playPauseBtn.addEventListener('click', () => {
+    playPauseBtn.addEventListener('click', async () => {
         if (audioPlayer.paused) {
-            audioPlayer.play();
-            playPauseBtn.textContent = '暂停';
+            try {
+                if (audioPlayer.readyState < 2) {
+                    audioPlayer.load();
+                }
+                await audioPlayer.play();
+                playPauseBtn.textContent = '暂停';
+            } catch (error) {
+                console.error('播放失败:', error);
+                playPauseBtn.textContent = '播放';
+            }
         } else {
             audioPlayer.pause();
             playPauseBtn.textContent = '播放';
@@ -1249,8 +1258,9 @@ function createAudioPlayerModal() {
             <div class="audio-player-container">
                 <h3 id="audioTitle"></h3>
                 <img id="audioCover" src="" alt="封面" style="max-width:200px; margin:1rem auto; display:block; border-radius:8px;">
-                <audio id="audioPlayer" controls style="width:100%; margin:1rem 0;">
+                <audio id="audioPlayer" style="display:none;">
                     <source id="audioSource" src="" type="audio/mpeg">
+                    <source id="audioSourceOgg" src="" type="audio/ogg">
                 </audio>
                 <div class="audio-controls">
                     <button id="audioPlayPauseBtn">播放</button>
@@ -1281,10 +1291,18 @@ function createAudioPlayerModal() {
     const audioProgress = document.getElementById('audioProgress');
     const audioTimeDisplay = document.getElementById('audioTimeDisplay');
     
-    playPauseBtn.addEventListener('click', () => {
+    playPauseBtn.addEventListener('click', async () => {
         if (audioPlayer.paused) {
-            audioPlayer.play();
-            playPauseBtn.textContent = '暂停';
+            try {
+                if (audioPlayer.readyState < 2) {
+                    audioPlayer.load();
+                }
+                await audioPlayer.play();
+                playPauseBtn.textContent = '暂停';
+            } catch (error) {
+                console.error('播放失败:', error);
+                playPauseBtn.textContent = '播放';
+            }
         } else {
             audioPlayer.pause();
             playPauseBtn.textContent = '播放';

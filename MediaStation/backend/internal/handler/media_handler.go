@@ -377,7 +377,7 @@ func isBrowserSupportedVideo(ext string) bool {
 }
 
 func isDirectStreamFile(ext string) bool {
-	supported := []string{".mp4", ".webm", ".ogg", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".txt", ".md", ".json"}
+	supported := []string{".mp4", ".webm", ".ogg", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".txt", ".md", ".json", ".mp3", ".wav", ".flac", ".aac", ".m4a"}
 	for _, e := range supported {
 		if strings.EqualFold(ext, e) {
 			return true
