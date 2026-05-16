@@ -39,6 +39,7 @@ func main() {
 	historyHandler := handler.NewHistoryHandler(historyService)
 
 	http.Handle("/stream", http.HandlerFunc(mediaHandler.StreamMedia))
+	http.Handle("/api/media/stream/", http.HandlerFunc(mediaHandler.StreamMediaByID))
 	http.Handle("/api/media", http.HandlerFunc(mediaHandler.GetMedia))
 	http.Handle("/api/media/list", http.HandlerFunc(mediaHandler.GetMediaList))
 	http.Handle("/hls/playlist", http.HandlerFunc(mediaHandler.HLSPlaylist))
