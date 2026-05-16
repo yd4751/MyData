@@ -1,109 +1,128 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
-
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Config 应用配置
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	Storage  StorageConfig  `mapstructure:"storage"`
-	Upload   UploadConfig   `mapstructure:"upload"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	JWT      JWTConfig      `yaml:"jwt"`
+	Storage  StorageConfig  `yaml:"storage"`
+	Upload   UploadConfig   `yaml:"upload"`
+	Logging  LoggingConfig  `yaml:"logging"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
-	Mode string `mapstructure:"mode"`
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+	Mode string `yaml:"mode"`
 }
 
 // DatabaseConfig 数据库配置
 type DatabaseConfig struct {
-	Host            string `mapstructure:"host"`
-	Port            int    `mapstructure:"port"`
-	Username        string `mapstructure:"username"`
-	Password        string `mapstructure:"password"`
-	Database        string `mapstructure:"database"`
-	Charset         string `mapstructure:"charset"`
-	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
-	MaxOpenConns    int    `mapstructure:"max_open_conns"`
-	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`
+	Host            string `yaml:"host"`
+	Port            int    `yaml:"port"`
+	Username        string `yaml:"username"`
+	Password        string `yaml:"password"`
+	Database        string `yaml:"database"`
+	Charset         string `yaml:"charset"`
+	MaxIdleConns    int    `yaml:"max_idle_conns"`
+	MaxOpenConns    int    `yaml:"max_open_conns"`
+	ConnMaxLifetime int    `yaml:"conn_max_lifetime"`
 }
 
 // JWTConfig JWT配置
 type JWTConfig struct {
-	Secret      string `mapstructure:"secret"`
-	ExpireHours int    `mapstructure:"expire_hours"`
+	Secret      string `yaml:"secret"`
+	ExpireHours int    `yaml:"expire_hours"`
 }
 
 // StorageConfig 存储配置
 type StorageConfig struct {
-	BasePath     string   `mapstructure:"base_path"`
-	TempPath     string   `mapstructure:"temp_path"`
-	MaxFileSize  int64    `mapstructure:"max_file_size"`
-	ChunkSize    int64    `mapstructure:"chunk_size"`
-	AllowedTypes []string `mapstructure:"allowed_types"`
+	BasePath     string   `yaml:"base_path"`
+	TempPath     string   `yaml:"temp_path"`
+	MaxFileSize  int64    `yaml:"max_file_size"`
+	ChunkSize    int64    `yaml:"chunk_size"`
+	AllowedTypes []string `yaml:"allowed_types"`
 }
 
 // UploadConfig 上传配置
 type UploadConfig struct {
-	MaxConcurrentUploads int  `mapstructure:"max_concurrent_uploads"`
-	CleanupTempFiles     bool `mapstructure:"cleanup_temp_files"`
-	TempFileExpiry       int  `mapstructure:"temp_file_expiry"`
+	MaxConcurrentUploads int  `yaml:"max_concurrent_uploads"`
+	CleanupTempFiles     bool `yaml:"cleanup_temp_files"`
+	TempFileExpiry       int  `yaml:"temp_file_expiry"`
 }
 
 // LoggingConfig 日志配置
 type LoggingConfig struct {
-	Level    string `mapstructure:"level"`
-	Output   string `mapstructure:"output"`
-	FilePath string `mapstructure:"file_path"`
+	Level    string `yaml:"level"`
+	Output   string `yaml:"output"`
+	FilePath string `yaml:"file_path"`
 }
 
 var AppConfig *Config
 
 // LoadConfig 加载配置文件
-func LoadConfig(configPath string) error {
-	if configPath == "" {
-		configPath = "configs/config.yaml"
+func LoadConfig(jsonConfigPath, yamlConfigPath string) error {
+	if yamlConfigPath == "" {
+		yamlConfigPath = "configs/config.yaml"
+	}
+	if jsonConfigPath == "" {
+		jsonConfigPath = "../../config.json"
 	}
 
-	// 获取配置文件的绝对路径
-	absPath, err := filepath.Abs(configPath)
+	// 加载JSON配置(只读取server部分)
+	var jsonConfig struct {
+		Backend struct {
+			Host string `json:"host"`
+			Port int    `json:"port"`
+		} `json:"backend"`
+	}
+
+	jsonAbsPath, err := filepath.Abs(jsonConfigPath)
 	if err != nil {
-		return fmt.Errorf("获取配置文件绝对路径失败: %v", err)
+		return fmt.Errorf("获取JSON配置文件绝对路径失败: %v", err)
 	}
 
-	// 直接读取JSON文件
-	data, err := os.ReadFile(absPath)
+	jsonData, err := os.ReadFile(jsonAbsPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %v", err)
+		return fmt.Errorf("读取JSON配置文件失败: %v", err)
 	}
 
-	// 解析JSON到结构体
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("解析配置文件失败: %v", err)
+	if err := json.Unmarshal(jsonData, &jsonConfig); err != nil {
+		return fmt.Errorf("解析JSON配置文件失败: %v", err)
 	}
 
-	// 转换配置结构以匹配原有格式
-	config.Server.Host = "0.0.0.0"
-	config.Server.Port = config.Backend.Port
-	config.Database.Host = config.Database.Host
-	config.Database.Port = config.Database.Port
-	config.Database.Username = config.Database.User
-	config.Database.Password = config.Database.Password
-	config.Database.Database = config.Database.Name
+	// 加载YAML配置
+	yamlAbsPath, err := filepath.Abs(yamlConfigPath)
+	if err != nil {
+		return fmt.Errorf("获取YAML配置文件绝对路径失败: %v", err)
+	}
 
-	AppConfig = &config
-	log.Printf("配置文件加载成功: %s", absPath)
+	yamlData, err := os.ReadFile(yamlAbsPath)
+	if err != nil {
+		return fmt.Errorf("读取YAML配置文件失败: %v", err)
+	}
+
+	var yamlConfig Config
+	if err := yaml.Unmarshal(yamlData, &yamlConfig); err != nil {
+		return fmt.Errorf("解析YAML配置文件失败: %v", err)
+	}
+
+	// 合并配置(JSON中的server配置优先)
+	yamlConfig.Server.Host = jsonConfig.Backend.Host
+	yamlConfig.Server.Port = jsonConfig.Backend.Port
+
+	AppConfig = &yamlConfig
+	log.Printf("配置文件加载成功 - JSON: %s, YAML: %s", jsonAbsPath, yamlAbsPath)
 	return nil
 }
 

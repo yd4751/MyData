@@ -252,8 +252,15 @@ async function createService(serviceData) {
 // 启动服务
 async function startService(serviceId) {
     try {
-        await fetch(`${apiBaseUrl}/services/${serviceId}/start`, {
-            method: 'POST'
+        const service = services.find(s => s.id == serviceId);
+        
+        if (!service) {
+            throw new Error('Service not found');
+        }
+
+        await fetch(`${apiBaseUrl}/services/start`, {
+            method: 'POST',
+            body: JSON.stringify(service)
         });
         fetchServices(); // 刷新服务列表
     } catch (error) {
@@ -264,8 +271,15 @@ async function startService(serviceId) {
 // 停止服务
 async function stopService(serviceId) {
     try {
-        await fetch(`${apiBaseUrl}/services/${serviceId}/stop`, {
-            method: 'POST'
+        const service = services.find(s => s.id == serviceId);
+        
+        if (!service) {
+            throw new Error('Service not found');
+        }
+
+        await fetch(`${apiBaseUrl}/services/stop`, {
+            method: 'POST',
+            body: JSON.stringify(service)
         });
         fetchServices(); // 刷新服务列表
     } catch (error) {

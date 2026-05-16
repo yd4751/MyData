@@ -19,8 +19,8 @@ import (
 )
 
 func main() {
-	// 加载配置
-	if err := utils.LoadConfig("configs/config.yaml"); err != nil {
+	// 加载配置(从config.json读取server配置，从config.yaml读取其他配置)
+	if err := utils.LoadConfig("../config.json", "configs/config.yaml"); err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func setupMiddleware(router *gin.Engine) {
 func setupRoutes(router *gin.Engine) {
 	// 提供静态文件（前端资源）
 	router.Static("/static", "../frontend")
-	
+
 	// 创建API处理器
 	userHandler := api.NewUserHandler()
 	resourceHandler, err := api.NewResourceHandler()
@@ -145,7 +145,7 @@ func setupRoutes(router *gin.Engine) {
 				resources.POST("", resourceHandler.CreateResource)
 				resources.GET("", resourceHandler.GetResources)
 				resources.POST("/batch", resourceHandler.BatchUpload)
-				
+
 				// 单个资源操作
 				resource := resources.Group("/:id")
 				{
@@ -154,7 +154,7 @@ func setupRoutes(router *gin.Engine) {
 					resource.DELETE("", resourceHandler.DeleteResource)
 					resource.GET("/progress", resourceHandler.GetUploadProgress)
 					resource.POST("/complete", resourceHandler.CompleteUpload)
-					
+
 					// 分片上传
 					resource.POST("/chunks/:chunkIndex", resourceHandler.UploadChunk)
 				}
@@ -187,7 +187,7 @@ func setupRoutes(router *gin.Engine) {
 	router.GET("/", func(c *gin.Context) {
 		c.File("../frontend/index.html")
 	})
-	
+
 	// 处理前端路由 - 所有未匹配的路由都返回前端首页（支持前端路由）
 	router.NoRoute(func(c *gin.Context) {
 		// 如果是API请求，返回404

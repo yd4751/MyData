@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaStation - 管理后台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #e94560;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #16213e;
+            color: #fff;
+        }
+        button {
+            background-color: #e94560;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #c73e54;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #0f3460;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tab.active {
+            background-color: #e94560;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .upload-area {
+            border: 2px dashed #0f3460;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .upload-area:hover {
+            border-color: #e94560;
+        }
+        #filePreview {
+            margin-top: 15px;
+            max-width: 200px;
+        }
+        .series-info {
+            background-color: #16213e;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>媒体管理后台</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('media')">添加媒体</button>
+            <button class="tab" onclick="showTab('series')">添加剧集</button>
+            <button class="tab" onclick="showTab('list')">媒体列表</button>
+        </div>
+
+        <div id="mediaTab" class="tab-content active">
+            <h2>添加媒体文件</h2>
+            <form id="mediaForm">
+                <div class="form-group">
+                    <label>媒体类型</label>
+                    <select id="mediaType">
+                        <option value="video">视频</option>
+                        <option value="audio">音频</option>
+                        <option value="image">图片</option>
+                        <option value="novel">小说</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>文件上传</label>
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect()">
+                        <p>点击或拖拽文件到此处</p>
+                    </div>
+                    <div id="filePreview"></div>
+                </div>
+                <div class="form-group">
+                    <label>所属剧集ID</label>
+                    <input type="number" id="seriesId" value="0">
+                </div>
+                <div class="form-group">
+                    <label>季数</label>
+                    <input type="number" id="season" value="0">
+                </div>
+                <div class="form-group">
+                    <label>集数</label>
+                    <input type="number" id="episode" value="0">
+                </div>
+                <button type="submit">添加媒体</button>
+                <div id="mediaMessage"></div>
+            </form>
+        </div>
+
+        <div id="seriesTab" class="tab-content">
+            <h2>添加剧集</h2>
+            <form id="seriesForm">
+                <div class="form-group">
+                    <label>剧集类型</label>
+                    <select id="seriesMediaType">
+                        <option value="video">视频</option>
+                        <option value="audio">音频</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>剧集名称</label>
+                    <input type="text" id="seriesTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>剧集描述</label>
+                    <textarea id="seriesDescription" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>封面图URL</label>
+                    <input type="text" id="seriesThumbnail" placeholder="https://example.com/cover.jpg">
+                </div>
+                <div class="form-group">
+                    <label>总集数</label>
+                    <input type="number" id="totalEpisodes" value="0">
+                </div>
+                <button type="submit">添加剧集</button>
+                <div id="seriesMessage"></div>
+            </form>
+        </div>
+
+        <div id="listTab" class="tab-content">
+            <h2>媒体列表</h2>
+            <div id="mediaList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(`${tabId}Tab`).classList.add('active');
+            
+            if (tabId === 'list') {
+                loadMediaList();
+            }
+        }
+
+        function handleFileSelect() {
+            const fileInput = document.getElementById('fileInput');
+            const preview = document.getElementById('filePreview');
+            
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const fileName = file.name;
+                const fileSize = (file.size / 1024).toFixed(2);
+                
+                preview.innerHTML = `<p>已选择: ${fileName} (${fileSize} KB)</p>`;
+                
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.innerHTML += `<img src="${e.target.result}" style="max-width:200px; margin-top:10px;">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+                
+                preview.innerHTML += '<p style="color:green;">✓ 时长、宽高、缩略图等信息将在上传时由服务器自动提取</p>';
+                
+                const title = extractTitleFromFilename(fileName);
+                if (!document.getElementById('title').value) {
+                    document.getElementById('title').value = title;
+                }
+                
+                const mediaType = detectMediaType(fileName, file.type);
+                document.getElementById('mediaType').value = mediaType;
+            }
+        }
+
+        function extractTitleFromFilename(filename) {
+            let title = filename;
+            
+            const lastDotIndex = title.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                title = title.substring(0, lastDotIndex);
+            }
+            
+            title = title.replace(/_/g, ' ').replace(/-/g, ' ');
+            title = title.replace(/\s+/g, ' ').trim();
+            
+            if (title.length > 50) {
+                title = title.substring(0, 50) + '...';
+            }
+            
+            return title.charAt(0).toUpperCase() + title.slice(1);
+        }
+
+        function detectMediaType(filename, mimeType) {
+            const videoExtensions = ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.flv', '.wmv', '.mpeg', '.mpg', '.m4v', '.3gp'];
+            const audioExtensions = ['.mp3', '.ogg', '.wav', '.flac', '.aac', '.m4a', '.wma', '.ape', '.alac'];
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+            const novelExtensions = ['.txt', '.epub', '.mobi', '.pdf'];
+            
+            const lowerName = filename.toLowerCase();
+            const ext = lowerName.substring(lowerName.lastIndexOf('.'));
+            
+            if (videoExtensions.includes(ext) || mimeType.startsWith('video/')) {
+                return 'video';
+            }
+            if (audioExtensions.includes(ext) || mimeType.startsWith('audio/')) {
+                return 'audio';
+            }
+            if (imageExtensions.includes(ext) || mimeType.startsWith('image/')) {
+                return 'image';
+            }
+            if (novelExtensions.includes(ext)) {
+                return 'novel';
+            }
+            
+            return 'video';
+        }
+
+        document.getElementById('mediaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('type', document.getElementById('mediaType').value);
+            formData.append('title', document.getElementById('title').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('series_id', document.getElementById('seriesId').value);
+            formData.append('season', document.getElementById('season').value);
+            formData.append('episode', document.getElementById('episode').value);
+            
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length > 0) {
+                formData.append('file', fileInput.files[0]);
+            }
+
+            const response = await fetch(`${API_BASE}/api/media/add`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            const message = document.getElementById('mediaMessage');
+            
+            if (response.ok) {
+                message.innerHTML = `<p class="success">媒体添加成功!</p>
+                    <p class="success">标题: ${result.title}</p>
+                    <p class="success">时长: ${result.duration}秒</p>
+                    <p class="success">尺寸: ${result.width}×${result.height}</p>
+                    <p class="success">是否竖屏: ${result.is_vertical ? '是' : '否'}</p>`;
+                document.getElementById('mediaForm').reset();
+                document.getElementById('filePreview').innerHTML = '';
+            } else {
+                message.innerHTML = `<p class="error">添加失败: ${result.error}</p>`;
+            }
+        });
+
+        document.getElementById('seriesForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                media_type: document.getElementById('seriesMediaType').value,
+                title: document.getElementById('seriesTitle').value,
+                description: document.getElementById('seriesDescription').value,
+                thumbnail: document.getElementById('seriesThumbnail').value,
+                total_episodes: document.getElementById('totalEpisodes').value
+            };
+
+            const response = await fetch(`${API_BASE}/api/series/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            const message = document.getElementById('seriesMessage');
+            
+            if (response.ok) {
+                message.innerHTML = '<p class="success">剧集添加成功!</p>';
+                document.getElementById('seriesForm').reset();
+            } else {
+                message.innerHTML = `<p class="error">添加失败: ${result.error}</p>`;
+            }
+        });
+
+        async function loadMediaList() {
+            const response = await fetch(`${API_BASE}/api/media/list?type=video`);
+            const mediaList = await response.json();
+            
+            const container = document.getElementById('mediaList');
+            container.innerHTML = `
+                <table style="width:100%; border-collapse: collapse;">
+                    <tr>
+                        <th>ID</th>
+                        <th>标题</th>
+                        <th>类型</th>
+                        <th>时长</th>
+                        <th>操作</th>
+                    </tr>
+                    ${mediaList.map(m => `
+                        <tr style="border-top:1px solid #0f3460;">
+                            <td>${m.id}</td>
+                            <td>${m.title}</td>
+                            <td>${m.type}</td>
+                            <td>${formatDuration(m.duration)}</td>
+                            <td><button onclick="deleteMedia(${m.id})">删除</button></td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+        }
+
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function deleteMedia(id) {
+            if (confirm('确定删除此媒体?')) {
+                const response = await fetch(`${API_BASE}/api/media/delete?id=${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadMediaList();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

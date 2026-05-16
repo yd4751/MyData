@@ -1,7 +1,8 @@
 {
   "backend": {
     "port": 7051,
-    "command": "go run backend/main.go"
+    "command": "go run backend/main.go",
+    "pid_file": "/tmp/service_manager.pid"
   },
   "database": {
     "host": "localhost",
