@@ -6,6 +6,11 @@ let currentEpisodeIndex = 0;
 let episodeList = [];
 let imageList = [];
 let currentImageIndex = 0;
+let currentMediaList = [];
+let currentMediaIndex = 0;
+let videoList = [];
+let audioList = [];
+let novelList = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadMedia('video');
@@ -72,8 +77,10 @@ function setupEventListeners() {
     document.getElementById('screenshotBtn').addEventListener('click', takeScreenshot);
     document.getElementById('rotateBtn').addEventListener('click', rotateVideo);
 
-    document.getElementById('prevImage').addEventListener('click', showPrevImage);
-    document.getElementById('nextImage').addEventListener('click', showNextImage);
+    document.getElementById('prevImage').addEventListener('click', showPrevItem);
+    document.getElementById('nextImage').addEventListener('click', showNextItem);
+    document.getElementById('prevChapter').addEventListener('click', showPrevItem);
+    document.getElementById('nextChapter').addEventListener('click', showNextItem);
 
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) {
@@ -131,6 +138,12 @@ async function loadMedia(type) {
 }
 
 function displayMedia(mediaList, type) {
+    // 添加这几行
+    if (type === 'video') videoList = mediaList;
+    else if (type === 'audio') audioList = mediaList;
+    else if (type === 'image') imageList = mediaList;
+    else if (type === 'novel') novelList = mediaList;
+    
     let gridId = `${type}Grid`;
     if (['short', 'movie', 'tv'].includes(type)) {
         gridId = 'videoGrid';
@@ -146,24 +159,66 @@ function displayMedia(mediaList, type) {
         const card = document.createElement('div');
         card.className = 'media-card';
         card.innerHTML = `
-            <img src="${media.thumbnail || 'https://via.placeholder.com/250x150'}" alt="${media.title}">
+            <img src="${media.thumbnail || getDefaultThumbnail(media.type)}" alt="${media.title}" onerror="this.src='${getDefaultThumbnail(media.type)}';">
+            <div class="play-overlay"></div>
             <div class="media-info">
                 <div class="media-title">${media.title}</div>
                 <div class="media-meta">
                     ${media.type === 'video' ? `${formatDuration(media.duration)}` : ''}
-                    ${media.seriesID ? `剧集 ${media.episode}` : ''}
+                    ${media.seriesID ? ` | 剧集 ${media.episode}` : ''}
                 </div>
             </div>
         `;
         card.addEventListener('click', () => {
             currentMedia = media;
-            openPlayer(media);
+            openMedia(media);
         });
         grid.appendChild(card);
     });
 }
 
-async function openPlayer(media) {
+function openMedia(media) {
+    currentMedia = media;
+    
+    // 添加这部分
+    switch(media.type) {
+        case 'video':
+            currentMediaList = videoList;
+            currentMediaIndex = videoList.findIndex(m => m.id === media.id);
+            break;
+        case 'audio':
+            currentMediaList = audioList;
+            currentMediaIndex = audioList.findIndex(m => m.id === media.id);
+            break;
+        case 'image':
+            currentMediaList = imageList;
+            currentMediaIndex = imageList.findIndex(m => m.id === media.id);
+            break;
+        case 'novel':
+            currentMediaList = novelList;
+            currentMediaIndex = novelList.findIndex(m => m.id === media.id);
+            break;
+    }
+
+    switch(media.type) {
+        case 'video':
+            openVideoPlayer(media);
+            break;
+        case 'audio':
+            openAudioPlayer(media);
+            break;
+        case 'image':
+            openImageViewer(media);
+            break;
+        case 'novel':
+            openNovelReader(media);
+            break;
+        default:
+            openVideoPlayer(media);
+    }
+}
+
+async function openVideoPlayer(media) {
     const modal = document.getElementById('playerModal');
     modal.style.display = 'block';
 
@@ -779,7 +834,8 @@ async function searchMedia(keyword) {
         const card = document.createElement('div');
         card.className = 'media-card';
         card.innerHTML = `
-            <img src="${media.thumbnail || 'https://via.placeholder.com/250x150'}" alt="${media.title}">
+            <img src="${media.thumbnail || getDefaultThumbnail(media.type)}" alt="${media.title}" onerror="this.src='${getDefaultThumbnail(media.type)}';">
+            <div class="play-overlay"></div>
             <div class="media-info">
                 <div class="media-title">${media.title}</div>
                 <div class="media-meta">${media.type}</div>
@@ -787,7 +843,7 @@ async function searchMedia(keyword) {
         `;
         card.addEventListener('click', () => {
             currentMedia = media;
-            openPlayer(media);
+            openMedia(media);
         });
         grid.appendChild(card);
     });
@@ -906,6 +962,157 @@ function handleBufferHole(error) {
     }
 }
 
+async function openAudioPlayer(media) {
+    const modal = document.getElementById('audioPlayerModal');
+    if (!modal) {
+        createAudioPlayerModal();
+    }
+    
+    document.getElementById('audioPlayerModal').style.display = 'block';
+    document.getElementById('audioTitle').textContent = media.title;
+    document.getElementById('audioSource').src = `${API_BASE}/api/media/stream/${media.id}`;
+    
+    const audioPlayer = document.getElementById('audioPlayer');
+    audioPlayer.load();
+    
+    const audioProgress = document.getElementById('audioProgress');
+    const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+    audioProgress.value = 0;
+    audioTimeDisplay.textContent = `00:00 / ${formatTime(media.duration)}`;
+    
+    document.getElementById('audioPlayPauseBtn').textContent = '播放';
+}
+
+function createAudioPlayerModal() {
+    const modal = document.createElement('div');
+    modal.id = 'audioPlayerModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content audio-player-content">
+            <span class="close">&times;</span>
+            <div class="audio-player-container">
+                <h3 id="audioTitle"></h3>
+                <img id="audioCover" src="" alt="封面" style="max-width:200px; margin:1rem auto; display:block; border-radius:8px;">
+                <audio id="audioPlayer" controls style="width:100%; margin:1rem 0;">
+                    <source id="audioSource" src="" type="audio/mpeg">
+                </audio>
+                <div class="audio-controls">
+                    <button id="audioPlayPauseBtn">播放</button>
+                    <input type="range" id="audioProgress" min="0" max="100" value="0">
+                    <span id="audioTimeDisplay">00:00 / 00:00</span>
+                    <select id="audioSpeed">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    const closeBtn = modal.querySelector('.close');
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        document.getElementById('audioPlayer').pause();
+    });
+    
+    const playPauseBtn = document.getElementById('audioPlayPauseBtn');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const audioProgress = document.getElementById('audioProgress');
+    const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+    
+    playPauseBtn.addEventListener('click', () => {
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            playPauseBtn.textContent = '暂停';
+        } else {
+            audioPlayer.pause();
+            playPauseBtn.textContent = '播放';
+        }
+    });
+    
+    audioPlayer.addEventListener('timeupdate', () => {
+        const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        audioProgress.value = progress;
+        audioTimeDisplay.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+    });
+    
+    audioProgress.addEventListener('input', () => {
+        const time = (audioProgress.value / 100) * audioPlayer.duration;
+        audioPlayer.currentTime = time;
+    });
+    
+    document.getElementById('audioSpeed').addEventListener('change', (e) => {
+        audioPlayer.playbackRate = parseFloat(e.target.value);
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            audioPlayer.pause();
+        }
+    });
+}
+
+function openImageViewer(media) {
+    const modal = document.getElementById('imageViewer');
+    modal.style.display = 'block';
+    
+    const img = document.getElementById('viewImage');
+    img.src = `${API_BASE}/api/media/stream/${media.id}`;
+    img.alt = media.title;
+}
+
+async function openNovelReader(media) {
+    const modal = document.getElementById('novelReader');
+    modal.style.display = 'block';
+    
+    document.getElementById('novelTitle').textContent = media.title;
+    
+    const response = await fetch(`${API_BASE}/api/media/stream/${media.id}`);
+    const content = await response.text();
+    document.getElementById('novelContent').textContent = content;
+}
+
+function getDefaultThumbnail(type) {
+    const colors = {
+        video: '#e53935',
+        audio: '#1e88e5',
+        image: '#43a047',
+        novel: '#fb8c00'
+    };
+    const icons = {
+        video: '<polygon points="80,60 140,100 80,140" fill="white"/>',
+        audio: '<circle cx="125" cy="100" r="30" fill="none" stroke="white" stroke-width="4"/><circle cx="125" cy="100" r="15" fill="white"/>',
+        image: '<rect x="80" y="60" width="90" height="60" fill="none" stroke="white" stroke-width="4"/><polygon points="170,60 140,90 140,60" fill="white"/>',
+        novel: '<rect x="75" y="70" width="35" height="80" fill="white" opacity="0.9"/><rect x="105" y="85" width="35" height="65" fill="white" opacity="0.7"/>'
+    };
+    const labels = { video: '视频', audio: '音频', image: '图片', novel: '小说' };
+    
+    const color = colors[type] || colors.video;
+    const icon = icons[type] || icons.video;
+    const label = labels[type] || '视频';
+    
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="340" viewBox="0 0 250 340">
+        <defs>
+            <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#fff;stop-opacity:0.2"/>
+                <stop offset="100%" style="stop-color:#000;stop-opacity:0.3"/>
+            </linearGradient>
+        </defs>
+        <rect fill="${color}" width="250" height="340"/>
+        <rect fill="url(#grad)" width="250" height="340"/>
+        <g transform="translate(0, 70)">${icon}</g>
+        <text fill="white" font-family="Arial" font-size="20" font-weight="bold" x="125" y="280" text-anchor="middle">${label}</text>
+    </svg>`;
+    
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
 function showHistory(history) {
     const list = document.getElementById('historyList');
     list.innerHTML = '';
@@ -1009,4 +1216,136 @@ function handleBufferHole(error) {
             // console.log('Adjusted currentTime to avoid buffer hole:', video.currentTime);
         }
     }
+}
+
+async function openAudioPlayer(media) {
+    const modal = document.getElementById('audioPlayerModal');
+    if (!modal) {
+        createAudioPlayerModal();
+    }
+    
+    document.getElementById('audioPlayerModal').style.display = 'block';
+    document.getElementById('audioTitle').textContent = media.title;
+    document.getElementById('audioSource').src = `${API_BASE}/api/media/stream/${media.id}`;
+    
+    const audioPlayer = document.getElementById('audioPlayer');
+    audioPlayer.load();
+    
+    const audioProgress = document.getElementById('audioProgress');
+    const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+    audioProgress.value = 0;
+    audioTimeDisplay.textContent = `00:00 / ${formatTime(media.duration)}`;
+    
+    document.getElementById('audioPlayPauseBtn').textContent = '播放';
+}
+
+function createAudioPlayerModal() {
+    const modal = document.createElement('div');
+    modal.id = 'audioPlayerModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content audio-player-content">
+            <span class="close">&times;</span>
+            <div class="audio-player-container">
+                <h3 id="audioTitle"></h3>
+                <img id="audioCover" src="" alt="封面" style="max-width:200px; margin:1rem auto; display:block; border-radius:8px;">
+                <audio id="audioPlayer" controls style="width:100%; margin:1rem 0;">
+                    <source id="audioSource" src="" type="audio/mpeg">
+                </audio>
+                <div class="audio-controls">
+                    <button id="audioPlayPauseBtn">播放</button>
+                    <input type="range" id="audioProgress" min="0" max="100" value="0">
+                    <span id="audioTimeDisplay">00:00 / 00:00</span>
+                    <select id="audioSpeed">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    const closeBtn = modal.querySelector('.close');
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        document.getElementById('audioPlayer').pause();
+    });
+    
+    const playPauseBtn = document.getElementById('audioPlayPauseBtn');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const audioProgress = document.getElementById('audioProgress');
+    const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+    
+    playPauseBtn.addEventListener('click', () => {
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            playPauseBtn.textContent = '暂停';
+        } else {
+            audioPlayer.pause();
+            playPauseBtn.textContent = '播放';
+        }
+    });
+    
+    audioPlayer.addEventListener('timeupdate', () => {
+        const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        audioProgress.value = progress;
+        audioTimeDisplay.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+    });
+    
+    audioProgress.addEventListener('input', () => {
+        const time = (audioProgress.value / 100) * audioPlayer.duration;
+        audioPlayer.currentTime = time;
+    });
+    
+    document.getElementById('audioSpeed').addEventListener('change', (e) => {
+        audioPlayer.playbackRate = parseFloat(e.target.value);
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            audioPlayer.pause();
+        }
+    });
+}
+
+function openImageViewer(media) {
+    const modal = document.getElementById('imageViewer');
+    modal.style.display = 'block';
+    
+    const img = document.getElementById('viewImage');
+    img.src = `${API_BASE}/api/media/stream/${media.id}`;
+    img.alt = media.title;
+}
+
+async function openNovelReader(media) {
+    const modal = document.getElementById('novelReader');
+    modal.style.display = 'block';
+    
+    document.getElementById('novelTitle').textContent = media.title;
+    
+    const response = await fetch(`${API_BASE}/api/media/stream/${media.id}`);
+    const content = await response.text();
+    document.getElementById('novelContent').textContent = content;
+}
+
+function setCurrentMediaList(list) {
+    currentMediaList = list;
+}
+
+function showPrevItem() {
+    if (currentMediaList.length === 0) return;
+    currentMediaIndex = (currentMediaIndex - 1 + currentMediaList.length) % currentMediaList.length;
+    openMedia(currentMediaList[currentMediaIndex]);
+}
+
+function showNextItem() {
+    if (currentMediaList.length === 0) return;
+    currentMediaIndex = (currentMediaIndex + 1) % currentMediaList.length;
+    openMedia(currentMediaList[currentMediaIndex]);
 }

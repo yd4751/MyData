@@ -113,15 +113,6 @@
             <h2>添加媒体文件</h2>
             <form id="mediaForm">
                 <div class="form-group">
-                    <label>媒体类型</label>
-                    <select id="mediaType">
-                        <option value="video">视频</option>
-                        <option value="audio">音频</option>
-                        <option value="image">图片</option>
-                        <option value="novel">小说</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label>标题</label>
                     <input type="text" id="title" required>
                 </div>
@@ -224,15 +215,12 @@
                     reader.readAsDataURL(file);
                 }
                 
-                preview.innerHTML += '<p style="color:green;">✓ 时长、宽高、缩略图等信息将在上传时由服务器自动提取</p>';
+                preview.innerHTML += '<p style="color:green;">✓ 时长、宽高、缩略图、媒体类型等信息将在上传时由服务器自动提取</p>';
                 
                 const title = extractTitleFromFilename(fileName);
                 if (!document.getElementById('title').value) {
                     document.getElementById('title').value = title;
                 }
-                
-                const mediaType = detectMediaType(fileName, file.type);
-                document.getElementById('mediaType').value = mediaType;
             }
         }
 
@@ -283,7 +271,6 @@
             e.preventDefault();
             
             const formData = new FormData();
-            formData.append('type', document.getElementById('mediaType').value);
             formData.append('title', document.getElementById('title').value);
             formData.append('description', document.getElementById('description').value);
             formData.append('series_id', document.getElementById('seriesId').value);

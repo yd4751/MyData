@@ -130,6 +130,23 @@ func (h *MediaHandler) SearchMedia(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(mediaList)
 }
 
+func (h *MediaHandler) StreamMediaByID(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseUint(parts[4], 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid media ID", http.StatusBadRequest)
+		return
+	}
+
+	h.streamMediaByID(w, r, uint(id))
+}
+
 func (h *MediaHandler) StreamMedia(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseUint(r.URL.Query().Get("id"), 10, 64)
 	if err != nil {
@@ -137,6 +154,10 @@ func (h *MediaHandler) StreamMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.streamMediaByID(w, r, uint(id))
+}
+
+func (h *MediaHandler) streamMediaByID(w http.ResponseWriter, r *http.Request, id uint) {
 	filePath, err := h.mediaService.StreamMedia(uint(id))
 	if err != nil {
 		http.Error(w, "Media not found", http.StatusNotFound)
@@ -145,38 +166,43 @@ func (h *MediaHandler) StreamMedia(w http.ResponseWriter, r *http.Request) {
 
 	ext := filepath.Ext(filePath)
 
-	if !isBrowserSupportedVideo(ext) && mediautil.IsFFmpegAvailable() {
+	if isDirectStreamFile(ext) {
+		file, err := os.Open(filePath)
+		if err != nil {
+			http.Error(w, "Failed to open media file", http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		fileInfo, err := file.Stat()
+		if err != nil {
+			http.Error(w, "Failed to get file info", http.StatusInternalServerError)
+			return
+		}
+
+		contentType := getContentType(ext)
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+		w.Header().Set("Accept-Ranges", "bytes")
+
+		rangeHeader := r.Header.Get("Range")
+		if rangeHeader != "" {
+			handleRangeRequest(w, r, file, fileInfo.Size())
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, file)
+		return
+	}
+
+	if mediautil.IsFFmpegAvailable() {
 		log.Printf("Transcoding non-supported video format: %s", ext)
 		streamWithFFmpeg(w, r, filePath)
 		return
 	}
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		http.Error(w, "Failed to open media file", http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		http.Error(w, "Failed to get file info", http.StatusInternalServerError)
-		return
-	}
-
-	contentType := getContentType(ext)
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
-	w.Header().Set("Accept-Ranges", "bytes")
-
-	rangeHeader := r.Header.Get("Range")
-	if rangeHeader != "" {
-		handleRangeRequest(w, r, file, fileInfo.Size())
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, file)
+	http.Error(w, "Unsupported media format", http.StatusUnsupportedMediaType)
 }
 
 func streamWithFFmpeg(w http.ResponseWriter, r *http.Request, filePath string) {
@@ -342,6 +368,16 @@ func getContentType(ext string) string {
 
 func isBrowserSupportedVideo(ext string) bool {
 	supported := []string{".mp4", ".webm", ".ogg"}
+	for _, e := range supported {
+		if strings.EqualFold(ext, e) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDirectStreamFile(ext string) bool {
+	supported := []string{".mp4", ".webm", ".ogg", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".txt", ".md", ".json"}
 	for _, e := range supported {
 		if strings.EqualFold(ext, e) {
 			return true
