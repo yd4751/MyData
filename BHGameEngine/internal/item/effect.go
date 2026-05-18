@@ -5,17 +5,18 @@ import (
 	"time"
 )
 
+// EffectContext 物品效果上下文
 type EffectContext struct {
-	PlayerID     int64
-	Inventory    *Inventory
-	Health       *int32
-	MaxHealth    *int32
-	Mana         *int32
-	MaxMana      *int32
-	Strength     *int32
-	Agility      *int32
-	Intelligence *int32
-	Defense      *int32
+	PlayerID     int64      // 玩家ID
+	Inventory    *Inventory // 背包
+	Health       *int32     // 当前生命值指针
+	MaxHealth    *int32     // 最大生命值指针
+	Mana         *int32     // 当前魔法值指针
+	MaxMana      *int32     // 最大魔法值指针
+	Strength     *int32     // 力量属性指针
+	Agility      *int32     // 敏捷属性指针
+	Intelligence *int32     // 智力属性指针
+	Defense      *int32     // 防御属性指针
 }
 
 func UseItem(inv *Inventory, slot int32, ctx *EffectContext) (bool, error) {

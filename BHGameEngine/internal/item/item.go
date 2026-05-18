@@ -4,119 +4,119 @@ import (
 	"sync"
 )
 
-type ItemCategory int32
+type ItemCategory int32 // 物品分类
 
 const (
-	ItemCategoryConsumable ItemCategory = 1
-	ItemCategoryEquipment  ItemCategory = 2
-	ItemCategoryMaterial   ItemCategory = 3
-	ItemCategoryQuest      ItemCategory = 4
-	ItemCategoryCurrency   ItemCategory = 5
+	ItemCategoryConsumable ItemCategory = 1 // 消耗品
+	ItemCategoryEquipment  ItemCategory = 2 // 装备
+	ItemCategoryMaterial   ItemCategory = 3 // 材料
+	ItemCategoryQuest      ItemCategory = 4 // 任务物品
+	ItemCategoryCurrency   ItemCategory = 5 // 货币
 )
 
-type ItemSubType int32
+type ItemSubType int32 // 物品子类型
 
 const (
-	SubTypePotion      ItemSubType = 101
-	SubTypeScroll      ItemSubType = 102
-	SubTypeFood        ItemSubType = 103
-	SubTypeWeapon      ItemSubType = 201
-	SubTypeArmor       ItemSubType = 202
-	SubTypeAccessory   ItemSubType = 203
-	SubTypeBasicMat    ItemSubType = 301
-	SubTypeAdvancedMat ItemSubType = 302
-	SubTypeStory       ItemSubType = 401
-	SubTypeReputation  ItemSubType = 402
-	SubTypeGold        ItemSubType = 501
-	SubTypeToken       ItemSubType = 502
+	SubTypePotion      ItemSubType = 101 // 药水
+	SubTypeScroll      ItemSubType = 102 // 卷轴
+	SubTypeFood        ItemSubType = 103 // 食物
+	SubTypeWeapon      ItemSubType = 201 // 武器
+	SubTypeArmor       ItemSubType = 202 // 护甲
+	SubTypeAccessory   ItemSubType = 203 // 饰品
+	SubTypeBasicMat    ItemSubType = 301 // 基础材料
+	SubTypeAdvancedMat ItemSubType = 302 // 高级材料
+	SubTypeStory       ItemSubType = 401 // 剧情物品
+	SubTypeReputation  ItemSubType = 402 // 声望物品
+	SubTypeGold        ItemSubType = 501 // 金币
+	SubTypeToken       ItemSubType = 502 // 代币
 )
 
-type ItemRarity int32
+type ItemRarity int32 // 物品稀有度
 
 const (
-	RarityCommon    ItemRarity = 1
-	RarityUncommon  ItemRarity = 2
-	RarityRare      ItemRarity = 3
-	RarityEpic      ItemRarity = 4
-	RarityLegendary ItemRarity = 5
+	RarityCommon    ItemRarity = 1 // 普通(白色)
+	RarityUncommon  ItemRarity = 2 // 优秀(绿色)
+	RarityRare      ItemRarity = 3 // 稀有(蓝色)
+	RarityEpic      ItemRarity = 4 // 史诗(紫色)
+	RarityLegendary ItemRarity = 5 // 传说(橙色)
 )
 
-type EquipmentSlot int32
+type EquipmentSlot int32 // 装备槽位
 
 const (
-	SlotWeapon   EquipmentSlot = 1
-	SlotArmor    EquipmentSlot = 2
-	SlotHelmet   EquipmentSlot = 3
-	SlotBoots    EquipmentSlot = 4
-	SlotGloves   EquipmentSlot = 5
-	SlotRing     EquipmentSlot = 6
-	SlotNecklace EquipmentSlot = 7
+	SlotWeapon   EquipmentSlot = 1 // 武器槽
+	SlotArmor    EquipmentSlot = 2 // 护甲槽
+	SlotHelmet   EquipmentSlot = 3 // 头盔槽
+	SlotBoots    EquipmentSlot = 4 // 靴子槽
+	SlotGloves   EquipmentSlot = 5 // 手套槽
+	SlotRing     EquipmentSlot = 6 // 戒指槽
+	SlotNecklace EquipmentSlot = 7 // 项链槽
 )
 
-type EffectType int32
+type EffectType int32 // 物品效果类型
 
 const (
-	EffectHealHP          EffectType = 1
-	EffectHealMP          EffectType = 2
-	EffectAddStrength     EffectType = 3
-	EffectAddAgility      EffectType = 4
-	EffectAddIntelligence EffectType = 5
-	EffectAddDefense      EffectType = 6
-	EffectTempBuff        EffectType = 7
+	EffectHealHP          EffectType = 1 // 恢复生命值
+	EffectHealMP          EffectType = 2 // 恢复魔法值
+	EffectAddStrength     EffectType = 3 // 增加力量
+	EffectAddAgility      EffectType = 4 // 增加敏捷
+	EffectAddIntelligence EffectType = 5 // 增加智力
+	EffectAddDefense      EffectType = 6 // 增加防御
+	EffectTempBuff        EffectType = 7 // 临时增益
 )
 
 type ItemConfig struct {
-	ID          int64
-	Name        string
-	Category    ItemCategory
-	SubType     ItemSubType
-	Rarity      ItemRarity
-	Level       int32
-	MaxStack    int32
-	Description string
-	Icon        string
+	ID          int64        // 物品唯一ID
+	Name        string       // 物品名称
+	Category    ItemCategory // 物品分类
+	SubType     ItemSubType  // 物品子类型
+	Rarity      ItemRarity   // 稀有度
+	Level       int32        // 物品等级
+	MaxStack    int32        // 最大堆叠数量
+	Description string       // 物品描述
+	Icon        string       // 图标路径
 
-	Attack       int32
-	Defense      int32
-	Strength     int32
-	Agility      int32
-	Intelligence int32
+	Attack       int32 // 攻击力加成
+	Defense      int32 // 防御力加成
+	Strength     int32 // 力量加成
+	Agility      int32 // 敏捷加成
+	Intelligence int32 // 智力加成
 
-	EffectType  EffectType
-	EffectValue int32
-	Cooldown    int32
-	Duration    int32
+	EffectType  EffectType // 效果类型
+	EffectValue int32      // 效果数值
+	Cooldown    int32      // 使用冷却时间(秒)
+	Duration    int32      // 效果持续时间(秒)
 
-	RequiredLevel int32
-	EquipmentSlot EquipmentSlot
+	RequiredLevel int32         // 装备需求等级
+	EquipmentSlot EquipmentSlot // 装备槽位
 
-	SellPrice int64
-	BuyPrice  int64
+	SellPrice int64 // 出售价格
+	BuyPrice  int64 // 购买价格
 }
 
 type InventoryItem struct {
-	ItemID     int64
-	Slot       int32
-	Count      int32
-	Level      int32
-	ExpireTime int64
-	UID        string
+	ItemID     int64  // 物品ID
+	Slot       int32  // 背包槽位
+	Count      int32  // 数量
+	Level      int32  // 物品强化等级
+	ExpireTime int64  // 过期时间戳
+	UID        string // 物品唯一标识
 }
 
 type CooldownEntry struct {
-	ItemID  int64
-	EndTime int64
+	ItemID  int64 // 物品ID
+	EndTime int64 // 冷却结束时间戳
 }
 
 type Equipment struct {
-	Slot   EquipmentSlot
-	ItemID int64
-	Level  int32
+	Slot   EquipmentSlot // 装备槽位
+	ItemID int64         // 物品ID
+	Level  int32         // 强化等级
 }
 
 var (
-	itemConfigs  = make(map[int64]*ItemConfig)
-	itemConfigMu sync.RWMutex
+	itemConfigs  = make(map[int64]*ItemConfig) // 物品配置表
+	itemConfigMu sync.RWMutex                  // 配置表并发锁
 )
 
 func RegisterItemConfig(config *ItemConfig) {

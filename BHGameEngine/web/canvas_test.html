@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0f; overflow: hidden; }
+        #testCanvas { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="testCanvas"></canvas>
+
+    <script>
+        function init() {
+            const canvas = document.getElementById('testCanvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const ctx = canvas.getContext('2d');
+            
+            console.log('Canvas size:', canvas.width, 'x', canvas.height);
+            console.log('Context:', ctx);
+            
+            ctx.fillStyle = '#0d0d14';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            ctx.shadowColor = '#22c55e';
+            ctx.shadowBlur = 25;
+            
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 18, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#86efac';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            console.log('Green dot drawn at:', centerX, centerY);
+        }
+        
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

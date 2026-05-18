@@ -13,10 +13,10 @@ import (
 )
 
 type Message struct {
-	ID       uint32
-	NodeType msg.NodeType
-	Data     []byte
-	Session  net.Conn
+	ID       uint32       // 消息ID
+	NodeType msg.NodeType // 目标节点类型
+	Data     []byte       // 消息数据
+	Session  net.Conn     // 客户端连接会话
 }
 
 type Handler interface {
@@ -24,9 +24,9 @@ type Handler interface {
 }
 
 type Server struct {
-	listener net.Listener
-	handler  Handler
-	running  bool
+	listener net.Listener // TCP监听器
+	handler  Handler      // 消息处理器
+	running  bool         // 服务器运行状态
 }
 
 func NewServer(handler Handler) *Server {

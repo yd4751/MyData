@@ -323,12 +323,22 @@ func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
 		return
 	}
 
+	targetItem.Count--
+	err = h.dataClient.UpdateItemCount(req.PlayerID, req.Position, targetItem.Count)
+	if err != nil {
+		log.Error("Failed to update item count:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
 	resp := msg.ItemUseResponse{
 		Result:  0,
 		Message: "Use success",
+		Slot:    req.Position,
+		Count:   targetItem.Count,
 	}
 
-	log.Info("Item use response sent: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID)
+	log.Info("Item use response sent: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID, ", NewCount=", targetItem.Count)
 	h.sendItemUseResponse(msgObj.Session, resp)
 }
 

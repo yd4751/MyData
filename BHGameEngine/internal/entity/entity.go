@@ -7,76 +7,81 @@ import (
 	"github.com/openworld-server/internal/worldmap"
 )
 
-type EntityType int32
+type EntityType int32 // 实体类型
 
 const (
-	EntityTypeMonster EntityType = 1
-	EntityTypeNPC     EntityType = 2
-	EntityTypeItem    EntityType = 3
-	EntityTypeTrigger EntityType = 4
+	EntityTypeMonster EntityType = 1 // 怪物
+	EntityTypeNPC     EntityType = 2 // NPC
+	EntityTypeItem    EntityType = 3 // 物品实体
+	EntityTypeTrigger EntityType = 4 // 触发器
 )
 
-type EntityState int32
+type EntityState int32 // 实体状态
 
 const (
-	EntityStateIdle      EntityState = 0
-	EntityStateMoving    EntityState = 1
-	EntityStateAttacking EntityState = 2
-	EntityStateDead      EntityState = 3
-	EntityStateSleeping  EntityState = 4
+	EntityStateIdle      EntityState = 0 // 空闲
+	EntityStateMoving    EntityState = 1 // 移动中
+	EntityStateAttacking EntityState = 2 // 攻击中
+	EntityStateDead      EntityState = 3 // 死亡
+	EntityStateSleeping  EntityState = 4 // 休眠
 )
 
+// Entity 实体基类
 type Entity struct {
-	ID           int64
-	Type         EntityType
-	Name         string
-	Pos          worldmap.Vec3
-	Rotation     float64
-	Health       int32
-	MaxHealth    int32
-	State        EntityState
-	ChunkPos     worldmap.ChunkPos
-	OwnerID      int64
-	SpawnTime    int64
-	DespawnTime  int64
-	AIEnabled    bool
-	InterestList map[int64]bool
-	mu           sync.RWMutex
+	ID           int64             // 实体ID
+	Type         EntityType        // 实体类型
+	Name         string            // 实体名称
+	Pos          worldmap.Vec3     // 位置坐标
+	Rotation     float64           // 朝向角度
+	Health       int32             // 当前生命值
+	MaxHealth    int32             // 最大生命值
+	State        EntityState       // 实体状态
+	ChunkPos     worldmap.ChunkPos // 所在区块位置
+	OwnerID      int64             // 所有者ID（如玩家掉落的物品）
+	SpawnTime    int64             // 生成时间
+	DespawnTime  int64             // 消失时间
+	AIEnabled    bool              // 是否启用AI
+	InterestList map[int64]bool    // 关注此实体的玩家列表
+	mu           sync.RWMutex      // 并发锁
 }
 
+// Monster 怪物
 type Monster struct {
 	Entity
-	Level          int32
-	ExpReward      int64
-	DropTableID    int64
-	SkillSet       []int32
-	PatrolRadius   float64
-	TargetID       int64
-	LastAttackTime int64
+	Level          int32   // 怪物等级
+	ExpReward      int64   // 击杀经验奖励
+	DropTableID    int64   // 掉落表ID
+	SkillSet       []int32 // 技能列表
+	PatrolRadius   float64 // 巡逻半径
+	TargetID       int64   // 当前目标ID
+	LastAttackTime int64   // 上次攻击时间
 }
 
+// NPC NPC
 type NPC struct {
 	Entity
-	DialogID    int64
-	QuestID     int64
-	ShopID      int64
-	ServiceType int32
+	DialogID    int64 // 对话ID
+	QuestID     int64 // 任务ID
+	ShopID      int64 // 商店ID
+	ServiceType int32 // 服务类型
 }
 
+// ItemEntity 物品实体（地面掉落）
 type ItemEntity struct {
 	Entity
-	ItemID       int64
-	StackCount   int32
-	ExpireTime   int64
-	IsPickupable bool
+	ItemID       int64 // 物品ID
+	StackCount   int32 // 堆叠数量
+	ExpireTime   int64 // 过期时间
+	IsPickupable bool  // 是否可拾取
 }
 
+// EntityManager 实体管理器
 type EntityManager struct {
-	entities map[int64]*Entity
-	monsters map[int64]*Monster
-	npc      map[int64]*NPC
-	items    map[int64]*ItemEntity
-	mu       sync.RWMutex
+	entities map[int64]*Entity     // 所有实体
+	monsters map[int64]*Monster    // 怪物实体
+	npc      map[int64]*NPC        // NPC实体
+	items    map[int64]*ItemEntity // 物品实体
+	mu       sync.RWMutex          // 并发锁
 }
 
 func NewEntityManager() *EntityManager {

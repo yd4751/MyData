@@ -7,18 +7,19 @@ import (
 )
 
 const (
-	DefaultInventorySize = 100
-	MaxEquipSlots        = 7
+	DefaultInventorySize = 100 // 默认背包容量
+	MaxEquipSlots        = 7   // 最大装备槽位数量
 )
 
+// Inventory 背包系统
 type Inventory struct {
-	OwnerID    int64
-	Items      map[int32]*InventoryItem
-	Equipments map[EquipmentSlot]*Equipment
-	Cooldowns  map[int64]*CooldownEntry
-	Gold       int64
-	Capacity   int32
-	mu         sync.RWMutex
+	OwnerID    int64                        // 所有者ID
+	Items      map[int32]*InventoryItem     // 物品列表（槽位->物品）
+	Equipments map[EquipmentSlot]*Equipment // 装备列表（槽位->装备）
+	Cooldowns  map[int64]*CooldownEntry     // 物品冷却列表（物品ID->冷却记录）
+	Gold       int64                        // 金币数量
+	Capacity   int32                        // 背包容量
+	mu         sync.RWMutex                 // 并发访问锁
 }
 
 func NewInventory(ownerID int64) *Inventory {

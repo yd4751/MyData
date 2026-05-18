@@ -6,39 +6,42 @@ import (
 	"time"
 )
 
-type TradeState int32
+type TradeState int32 // 交易状态
 
 const (
-	TradeStatePending   TradeState = 1
-	TradeStateAccepted  TradeState = 2
-	TradeStateCompleted TradeState = 3
-	TradeStateCancelled TradeState = 4
+	TradeStatePending   TradeState = 1 // 待确认
+	TradeStateAccepted  TradeState = 2 // 已接受
+	TradeStateCompleted TradeState = 3 // 已完成
+	TradeStateCancelled TradeState = 4 // 已取消
 )
 
+// TradeItem 交易物品
 type TradeItem struct {
-	ItemID int64
-	Count  int32
+	ItemID int64 // 物品ID
+	Count  int32 // 数量
 }
 
+// Trade 交易
 type Trade struct {
-	ID            int64
-	Player1ID     int64
-	Player2ID     int64
-	Player1Items  []*TradeItem
-	Player2Items  []*TradeItem
-	Player1Gold   int64
-	Player2Gold   int64
-	Player1Accept bool
-	Player2Accept bool
-	State         TradeState
-	CreatedAt     int64
-	ExpireAt      int64
-	mu            sync.RWMutex
+	ID            int64        // 交易ID
+	Player1ID     int64        // 玩家1ID
+	Player2ID     int64        // 玩家2ID
+	Player1Items  []*TradeItem // 玩家1提供的物品
+	Player2Items  []*TradeItem // 玩家2提供的物品
+	Player1Gold   int64        // 玩家1提供的金币
+	Player2Gold   int64        // 玩家2提供的金币
+	Player1Accept bool         // 玩家1是否已确认
+	Player2Accept bool         // 玩家2是否已确认
+	State         TradeState   // 交易状态
+	CreatedAt     int64        // 创建时间
+	ExpireAt      int64        // 过期时间
+	mu            sync.RWMutex // 并发锁
 }
 
+// TradeManager 交易管理器
 type TradeManager struct {
-	trades map[int64]*Trade
-	mu     sync.RWMutex
+	trades map[int64]*Trade // 交易列表
+	mu     sync.RWMutex     // 并发锁
 }
 
 var tradeManager *TradeManager

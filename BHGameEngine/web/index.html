@@ -44,6 +44,130 @@
         .stamina-fill { background: linear-gradient(90deg, #22c55e, #84cc16); }
         .status-value { font-size: 12px; color: #aaa; }
         
+        /* 技能特效 */
+        .skill-effect {
+            position: absolute;
+            pointer-events: none;
+            z-index: 100;
+            border-radius: 50%;
+            animation: skillEffect 0.6s ease-out forwards;
+        }
+        
+        .skill-effect-fire {
+            background: radial-gradient(circle, #ff6b35 0%, #f7931e 40%, #ff4500 70%, transparent 100%);
+            box-shadow: 0 0 30px #ff6b35, 0 0 60px #f7931e;
+        }
+        
+        .skill-effect-ice {
+            background: radial-gradient(circle, #00d4ff 0%, #3b82f6 40%, #1e40af 70%, transparent 100%);
+            box-shadow: 0 0 30px #00d4ff, 0 0 60px #3b82f6;
+        }
+        
+        .skill-effect-lightning {
+            background: radial-gradient(circle, #fbbf24 0%, #facc15 40%, #eab308 70%, transparent 100%);
+            box-shadow: 0 0 30px #fbbf24, 0 0 60px #facc15;
+        }
+        
+        .skill-effect-heal {
+            background: radial-gradient(circle, #22c55e 0%, #16a34a 40%, #15803d 70%, transparent 100%);
+            box-shadow: 0 0 30px #22c55e, 0 0 60px #16a34a;
+        }
+        
+        .skill-effect-shield {
+            background: radial-gradient(circle, #8b5cf6 0%, #6366f1 40%, #4f46e5 70%, transparent 100%);
+            box-shadow: 0 0 30px #8b5cf6, 0 0 60px #6366f1;
+        }
+        
+        .skill-effect-normal {
+            background: radial-gradient(circle, #9ca3af 0%, #6b7280 40%, #4b5563 70%, transparent 100%);
+            box-shadow: 0 0 20px #9ca3af;
+        }
+        
+        @keyframes skillEffect {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.5);
+                opacity: 0;
+            }
+        }
+        
+        /* 技能弹道 */
+        .skill-projectile {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 99;
+            animation: projectileMove 0.4s linear forwards;
+        }
+        
+        .projectile-fire {
+            background: #ff6b35;
+            box-shadow: 0 0 15px #ff6b35;
+        }
+        
+        .projectile-ice {
+            background: #00d4ff;
+            box-shadow: 0 0 15px #00d4ff;
+        }
+        
+        .projectile-lightning {
+            background: #fbbf24;
+            box-shadow: 0 0 15px #fbbf24;
+        }
+        
+        @keyframes projectileMove {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0.5;
+                transform: scale(0.5);
+            }
+        }
+        
+        /* 伤害数字 */
+        .damage-number {
+            position: absolute;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 101;
+            animation: damageFloat 1s ease-out forwards;
+        }
+        
+        .damage-number.damage {
+            color: #ef4444;
+            text-shadow: 0 0 10px #ef4444;
+        }
+        
+        .damage-number.heal {
+            color: #22c55e;
+            text-shadow: 0 0 10px #22c55e;
+        }
+        
+        @keyframes damageFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) scale(1.2);
+            }
+        }
+        
         /* 属性面板 */
         .stats-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .panel-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #aaa; }
@@ -96,8 +220,8 @@
         
         /* 地图区域 */
         .map-area { flex: 1; position: relative; overflow: hidden; }
-        .map-canvas { width: 100%; height: 100%; }
-        .map-overlay { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; pointer-events: none; }
+        .map-canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        .map-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
         .player-marker { position: absolute; width: 32px; height: 32px; background: #00d4ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(0,212,255,0.5); pointer-events: none; }
         .npc-marker { position: absolute; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(245,158,11,0.5); pointer-events: none; }
         .monster-marker { position: absolute; width: 20px; height: 20px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(239,68,68,0.5); pointer-events: none; }
@@ -315,7 +439,7 @@
             <div class="map-area">
                 <canvas id="mapCanvas" class="map-canvas"></canvas>
                 <div class="map-overlay">
-                    <div class="player-marker" id="playerMarker" style="left: 50%; top: 50%;"></div>
+                    <div class="player-marker" id="playerMarker" style="display: none;"></div>
                     <div class="npc-marker" style="left: 30%; top: 30%;"></div>
                     <div class="monster-marker" style="left: 70%; top: 60%;"></div>
                     <div class="monster-marker" style="left: 40%; top: 70%;"></div>
@@ -470,6 +594,7 @@
         let currentTarget = null;
         let sessionID = '';
         let playerID = 0;
+        let battleID = 0;  // 战斗ID，用于后端战斗系统
         
         // 背包状态
         let inventoryItems = {};      // 物品 {slot: {itemID, count, level, uid}}
@@ -495,6 +620,18 @@
         // 装备槽位名称
         const EQUIP_SLOT_NAMES = {
             1: '武器', 2: '护甲', 3: '头盔', 4: '靴子', 5: '手套', 6: '戒指', 7: '项链'
+        };
+        
+        // 技能配置（全局定义，确保在 useSkill 之前加载）
+        const SKILL_CONFIG = {
+            1: {name: '普通攻击', damage: 15, mana: 0, effectType: 'normal', projectile: false},
+            2: {name: '火球术', damage: 30, mana: 10, effectType: 'fire', projectile: true},
+            3: {name: '冰霜箭', damage: 25, mana: 8, effectType: 'ice', projectile: true},
+            4: {name: '闪电链', damage: 20, mana: 12, effectType: 'lightning', projectile: true},
+            100: {name: '治疗术', damage: -30, mana: 15, effectType: 'heal', projectile: false},
+            101: {name: '护盾', damage: 0, mana: 10, effectType: 'shield', projectile: false},
+            102: {name: '加速', damage: 0, mana: 5, effectType: 'lightning', projectile: false},
+            103: {name: '瞬移', damage: 0, mana: 20, effectType: 'lightning', projectile: false}
         };
         
         // 移动相关
@@ -571,10 +708,10 @@
             msgRouter.register(MSG.PLAYER_INFO_RES, NODE_TYPE.LOGIC);
             msgRouter.register(MSG.PLAYER_MOVE_REQ, NODE_TYPE.LOGIC);
             msgRouter.register(MSG.PLAYER_MOVE_RES, NODE_TYPE.LOGIC);
-            msgRouter.register(MSG.ATTACK_REQ, NODE_TYPE.LOGIC);
-            msgRouter.register(MSG.ATTACK_RES, NODE_TYPE.LOGIC);
-            msgRouter.register(MSG.SKILL_REQ, NODE_TYPE.LOGIC);
-            msgRouter.register(MSG.SKILL_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.ATTACK_REQ, NODE_TYPE.BATTLE);
+            msgRouter.register(MSG.ATTACK_RES, NODE_TYPE.BATTLE);
+            msgRouter.register(MSG.SKILL_REQ, NODE_TYPE.BATTLE);
+            msgRouter.register(MSG.SKILL_RES, NODE_TYPE.BATTLE);
             msgRouter.register(MSG.INVENTORY_REQ, NODE_TYPE.LOGIC);
             msgRouter.register(MSG.INVENTORY_RES, NODE_TYPE.LOGIC);
             msgRouter.register(MSG.ITEM_USE_REQ, NODE_TYPE.LOGIC);
@@ -639,6 +776,27 @@
             mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
             mapEngine.loadInitialChunks();
             mapEngine.setDebugMode(true);
+        }
+        
+        // 调整地图canvas尺寸
+        function resizeMapCanvas() {
+            const canvas = document.getElementById('mapCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width || window.innerWidth;
+            const height = rect.height || window.innerHeight;
+            
+            console.log('resizeMapCanvas - new size:', width, 'x', height);
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            if (mapEngine && mapEngine.viewport) {
+                mapEngine.viewport.resize(width, height);
+            }
+            
+            if (mapEngine) {
+                mapEngine.forceRender();
+            }
         }
         
         // 初始化键盘控制
@@ -746,17 +904,9 @@
             checkNPCInteraction();
         }
         
-        // 更新玩家标记位置
+        // 更新玩家标记位置（现在由地图引擎渲染）
         function updatePlayerMarker() {
-            const marker = document.getElementById('playerMarker');
-            if (marker && mapEngine) {
-                const screenPos = mapEngine.worldToScreen({ x: playerX, y: playerY });
-                const mapArea = document.querySelector('.map-area');
-                const rect = mapArea.getBoundingClientRect();
-                
-                marker.style.left = (screenPos.x / rect.width * 100) + '%';
-                marker.style.top = (screenPos.y / rect.height * 100) + '%';
-            }
+            // 玩家现在在Canvas中心渲染，无需更新DOM标记
         }
         
         // WebSocket连接
@@ -918,6 +1068,7 @@
                     case MSG.PLAYER_INFO_RES: handlePlayerInfoResponse(msg); break;
                     case MSG.PLAYER_MOVE_RES: handleMoveResponse(msg); break;
                     case MSG.ATTACK_RES: handleAttackResponse(msg); break;
+                    case MSG.SKILL_RES: handleSkillResponse(msg); break;
                     case MSG.INVENTORY_RES: handleInventoryResponse(msg); break;
                     case MSG.ITEM_USE_RES: handleItemUseResponse(msg); break;
                     case MSG.EQUIP_ITEM_RES: handleEquipResponse(msg); break;
@@ -995,6 +1146,10 @@
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('gameUI').classList.remove('hidden');
                 
+                setTimeout(() => {
+                    resizeMapCanvas();
+                }, 100);
+                
                 document.getElementById('playerName').textContent = data.player_name || '测试玩家';
                 document.getElementById('playerLevel').textContent = 'Lv.' + (data.level || 1);
                 
@@ -1026,14 +1181,14 @@
         function initTestInventory() {
             // 初始化物品配置
             itemConfigs = {
-                1001: { id: 1001, name: '小型生命药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复50点生命值', effect_type: 1, effect_value: 50 },
-                1002: { id: 1002, name: '中型生命药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复100点生命值', effect_type: 1, effect_value: 100 },
-                2001: { id: 2001, name: '小型魔法药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复30点魔法值', effect_type: 2, effect_value: 30 },
-                4001: { id: 4001, name: '铁剑', category: 2, sub_type: 201, rarity: 1, level: 1, max_stack: 1, description: '普通的铁剑', attack: 10, equipment_slot: 1 },
-                4003: { id: 4003, name: '皮甲', category: 2, sub_type: 202, rarity: 1, level: 1, max_stack: 1, description: '普通的皮甲', defense: 8, equipment_slot: 2 },
-                5001: { id: 5001, name: '铁矿', category: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '常见的铁矿石' },
-                5002: { id: 5002, name: '木材', category: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '普通的木材' },
-                6001: { id: 6001, name: '神秘钥匙', category: 4, sub_type: 401, rarity: 2, level: 1, max_stack: 1, description: '开启神秘之门的钥匙' }
+                1001: { id: 1001, name: '小型生命药水', type: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复50点生命值', effect_type: 1, effect_value: 50 },
+                1002: { id: 1002, name: '中型生命药水', type: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复100点生命值', effect_type: 1, effect_value: 100 },
+                2001: { id: 2001, name: '小型魔法药水', type: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复30点魔法值', effect_type: 2, effect_value: 30 },
+                4001: { id: 4001, name: '铁剑', type: 2, sub_type: 201, rarity: 1, level: 1, max_stack: 1, description: '普通的铁剑', attack: 10, equipment_slot: 1 },
+                4003: { id: 4003, name: '皮甲', type: 2, sub_type: 202, rarity: 1, level: 1, max_stack: 1, description: '普通的皮甲', defense: 8, equipment_slot: 2 },
+                5001: { id: 5001, name: '铁矿', type: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '常见的铁矿石' },
+                5002: { id: 5002, name: '木材', type: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '普通的木材' },
+                6001: { id: 6001, name: '神秘钥匙', type: 4, sub_type: 401, rarity: 2, level: 1, max_stack: 1, description: '开启神秘之门的钥匙' }
             };
             
             // 初始化背包物品
@@ -1216,32 +1371,37 @@
         
         // 使用技能
         function useSkill(skillId) {
-            const skills = {
-                1: {name: '普通攻击', damage: 15, mana: 0},
-                2: {name: '火球术', damage: 30, mana: 10},
-                3: {name: '冰霜箭', damage: 25, mana: 8},
-                4: {name: '闪电链', damage: 20, mana: 12},
-                100: {name: '治疗术', damage: -30, mana: 15},
-                101: {name: '护盾', damage: 0, mana: 10},
-                102: {name: '加速', damage: 0, mana: 5},
-                103: {name: '瞬移', damage: 0, mana: 20}
-            };
+            console.log('useSkill called with skillId:', skillId);
+            console.log('SKILL_CONFIG:', SKILL_CONFIG);
             
-            const skill = skills[skillId];
-            if (!skill) return;
+            const skill = SKILL_CONFIG[skillId];
+            console.log('skill:', skill);
+            
+            if (!skill) {
+                console.log('Skill not found for id:', skillId);
+                return;
+            }
+            
+            console.log('playerMana:', playerMana, 'skill.mana:', skill.mana);
             
             if (playerMana < skill.mana) {
                 addBattleLog('system', '魔法值不足！');
+                console.log('Not enough mana');
                 return;
             }
             
             playerMana -= skill.mana;
+            
+            // 播放技能释放特效
+            playSkillEffect(skillId, skill);
             
             if (skillId >= 100) {
                 // 治疗或增益
                 if (skillId === 100) {
                     playerHealth = Math.min(MAX_HEALTH, playerHealth - skill.damage);
                     addBattleLog('heal', `使用 ${skill.name}，恢复了 ${-skill.damage} 点生命值`);
+                    // 显示治疗数字
+                    showDamageNumber(300, 200, -skill.damage, 'heal');
                 } else {
                     addBattleLog('skill', `使用 ${skill.name}`);
                 }
@@ -1249,6 +1409,9 @@
                 // 攻击技能
                 monsterHealth = Math.max(0, monsterHealth - skill.damage);
                 addBattleLog('damage', `使用 ${skill.name} 对 ${currentTarget} 造成了 ${skill.damage} 点伤害`);
+                
+                // 显示伤害数字（怪物位置）
+                showDamageNumber(700, 300, skill.damage, 'damage');
                 
                 updateMonsterHealth();
                 
@@ -1258,7 +1421,137 @@
             }
             
             updatePlayerStats();
-            sendMessage(MSG.SKILL_REQ, {player_id: playerID, session_id: sessionID, skill_id: skillId, target_id: currentTarget || 0});
+            
+            console.log('Sending SKILL_REQ - battle_id:', battleID, 'player_id:', playerID, 'skill_id:', skillId, 'target_id:', currentTarget || 0);
+            sendMessage(MSG.SKILL_REQ, {battle_id: battleID, player_id: playerID, skill_id: skillId, target_id: currentTarget || 0});
+            
+            console.log('useSkill completed for skillId:', skillId);
+        }
+        
+        // 播放技能特效
+        function playSkillEffect(skillId, skill) {
+            const battleUI = document.getElementById('battleUI');
+            if (!battleUI || battleUI.classList.contains('hidden')) return;
+            
+            // 玩家位置（战斗界面左侧）
+            const playerPos = { x: 60, y: 30 };
+            // 怪物位置（战斗界面右侧）
+            const monsterPos = { x: 700, y: 30 };
+            
+            // 播放施法者特效
+            createSkillEffect(playerPos.x, playerPos.y, skill.effectType);
+            
+            // 如果有弹道，创建弹道效果
+            if (skill.projectile && skillId < 100 && isInBattle) {
+                createProjectile(playerPos.x, playerPos.y, monsterPos.x, monsterPos.y, skill.effectType);
+                
+                // 在目标位置播放命中特效
+                setTimeout(() => {
+                    createSkillEffect(monsterPos.x, monsterPos.y, skill.effectType);
+                }, 400);
+            }
+            
+            // 治疗技能在玩家位置播放特效
+            if (skillId === 100) {
+                createSkillEffect(playerPos.x, playerPos.y, skill.effectType);
+            }
+        }
+        
+        // 创建技能特效
+        function createSkillEffect(x, y, effectType) {
+            const effect = document.createElement('div');
+            effect.className = `skill-effect skill-effect-${effectType}`;
+            effect.style.left = x + 'px';
+            effect.style.top = y + 'px';
+            effect.style.width = '60px';
+            effect.style.height = '60px';
+            
+            document.body.appendChild(effect);
+            
+            setTimeout(() => {
+                effect.remove();
+            }, 600);
+        }
+        
+        // 创建技能弹道
+        function createProjectile(startX, startY, endX, endY, effectType) {
+            const projectile = document.createElement('div');
+            projectile.className = `skill-projectile projectile-${effectType}`;
+            projectile.style.left = startX + 'px';
+            projectile.style.top = startY + 'px';
+            
+            // 设置CSS动画路径
+            projectile.style.setProperty('--startX', startX + 'px');
+            projectile.style.setProperty('--startY', startY + 'px');
+            projectile.style.setProperty('--endX', endX + 'px');
+            projectile.style.setProperty('--endY', endY + 'px');
+            
+            // 使用requestAnimationFrame实现移动
+            document.body.appendChild(projectile);
+            
+            const duration = 400;
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const currentX = startX + (endX - startX) * progress;
+                const currentY = startY + (endY - startY) * progress;
+                
+                projectile.style.left = currentX + 'px';
+                projectile.style.top = currentY + 'px';
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    projectile.remove();
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 显示伤害/治疗数字
+        function showDamageNumber(x, y, value, type) {
+            const damageNum = document.createElement('div');
+            damageNum.className = `damage-number ${type}`;
+            damageNum.textContent = (type === 'damage' ? '-' : '+') + value;
+            damageNum.style.left = x + 'px';
+            damageNum.style.top = y + 'px';
+            
+            document.body.appendChild(damageNum);
+            
+            setTimeout(() => {
+                damageNum.remove();
+            }, 1000);
+        }
+        
+        // 技能使用响应
+        function handleSkillResponse(data) {
+            if (data.result === 0) {
+                addChatMessage('system', `技能释放成功！`);
+                
+                if (data.damage) {
+                    addBattleLog('damage', `技能造成了 ${data.damage} 点伤害`);
+                }
+                
+                if (data.heal) {
+                    playerHealth = Math.min(MAX_HEALTH, playerHealth + data.heal);
+                    addBattleLog('heal', `恢复了 ${data.heal} 点生命值`);
+                }
+                
+                if (data.mana_cost !== undefined) {
+                    playerMana = Math.max(0, playerMana - data.mana_cost);
+                }
+                
+                if (data.health !== undefined) playerHealth = data.health;
+                if (data.mana !== undefined) playerMana = data.mana;
+                
+                updatePlayerStats();
+            } else {
+                addChatMessage('system', `技能释放失败: ${data.message || '未知错误'}`);
+            }
         }
         
         // 开始战斗
@@ -1274,6 +1567,7 @@
             isInBattle = true;
             currentTarget = monster.name;
             monsterHealth = monster.health;
+            battleID = Date.now();  // 使用时间戳作为战斗ID
             document.getElementById('debugBattle').textContent = '是';
             
             document.getElementById('battleUI').classList.remove('hidden');
@@ -1306,6 +1600,7 @@
             }
             
             currentTarget = null;
+            battleID = 0;  // 重置战斗ID
         }
         
         // 打开攻击模式
@@ -1449,8 +1744,18 @@
         
         // 使用物品
         function useItem(slot) {
+            console.log('useItem called with slot:', slot);
+            console.log('inventoryItems:', JSON.stringify(inventoryItems));
+            
             const item = inventoryItems[slot];
-            if (!item) return;
+            if (!item) {
+                console.log('useItem: slot', slot, 'is empty');
+                return;
+            }
+            
+            console.log('item found:', item);
+            console.log('item.itemID:', item.itemID);
+            console.log('itemConfigs:', JSON.stringify(itemConfigs));
             
             const config = itemConfigs[item.itemID];
             if (!config) {
@@ -1458,16 +1763,20 @@
                 return;
             }
             
-            // 消耗品才能使用
-            if (config.category !== 1) {
+            console.log('item config:', config);
+            console.log('config.category:', config.category);
+            
+            // 消耗品才能使用（type为1表示消耗品）
+            if (config.type !== 1) {
                 addChatMessage('system', '[系统] 该物品不能使用');
                 return;
             }
             
+            console.log('useItem - sending ITEM_USE_REQ for slot:', slot, 'item:', item);
             sendMessage(MSG.ITEM_USE_REQ, {
                 player_id: playerID,
                 session_id: sessionID,
-                slot: slot
+                position: slot
             });
         }
         
@@ -1651,7 +1960,7 @@
                     
                     // 添加点击事件
                     cell.onclick = function() {
-                        showItemTooltip(item, config, i);
+                        useItem(i);
                     };
                 } else {
                     cell.innerHTML = '<div class="item-icon" style="opacity: 0.3;">📦</div>';

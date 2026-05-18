@@ -12,56 +12,61 @@ import (
 	"github.com/openworld-server/pkg/snowflake"
 )
 
-type BattleState int32
+type BattleState int32 // 战斗状态
 
 const (
-	BattleStateActive BattleState = 1
-	BattleStateEnded  BattleState = 2
+	BattleStateActive BattleState = 1 // 进行中
+	BattleStateEnded  BattleState = 2 // 已结束
 )
 
+// Battle 战斗实例
 type Battle struct {
-	ID          int64
-	Players     map[int64]*player.Player
-	Monsters    map[int64]*entity.Monster
-	StartTime   int64
-	EndTime     int64
-	State       BattleState
-	CombatLogs  []*CombatLog
-	ComboTracks map[int64]*ComboTracker
-	mu          sync.RWMutex
+	ID          int64                     // 战斗ID
+	Players     map[int64]*player.Player  // 参战玩家
+	Monsters    map[int64]*entity.Monster // 参战怪物
+	StartTime   int64                     // 开始时间
+	EndTime     int64                     // 结束时间
+	State       BattleState               // 战斗状态
+	CombatLogs  []*CombatLog              // 战斗日志
+	ComboTracks map[int64]*ComboTracker   // 连招追踪
+	mu          sync.RWMutex              // 并发锁
 }
 
+// ComboTracker 连招追踪器
 type ComboTracker struct {
-	SkillSequence []int64
-	CurrentIndex  int
-	LastCastTime  int64
-	MaxDelay      int
+	SkillSequence []int64 // 技能序列
+	CurrentIndex  int     // 当前索引
+	LastCastTime  int64   // 上次释放时间
+	MaxDelay      int     // 最大间隔(毫秒)
 }
 
+// SkillCombatLog 技能战斗日志
 type SkillCombatLog struct {
-	Timestamp int64
-	Attacker  int64
-	Target    int64
-	SkillID   int64
-	Damage    int32
-	Heal      int32
-	IsCombo   bool
-	Effect    string
+	Timestamp int64  // 时间戳
+	Attacker  int64  // 攻击者ID
+	Target    int64  // 目标ID
+	SkillID   int64  // 技能ID
+	Damage    int32  // 伤害值
+	Heal      int32  // 治疗值
+	IsCombo   bool   // 是否连招
+	Effect    string // 效果描述
 }
 
+// CombatLog 战斗日志
 type CombatLog struct {
-	Timestamp int64
-	Attacker  int64
-	Target    int64
-	SkillID   int64
-	Damage    int32
-	Heal      int32
-	Effect    string
+	Timestamp int64  // 时间戳
+	Attacker  int64  // 攻击者ID
+	Target    int64  // 目标ID
+	SkillID   int64  // 技能ID
+	Damage    int32  // 伤害值
+	Heal      int32  // 治疗值
+	Effect    string // 效果描述
 }
 
+// BattleManager 战斗管理器
 type BattleManager struct {
-	battles map[int64]*Battle
-	mu      sync.RWMutex
+	battles map[int64]*Battle // 战斗列表
+	mu      sync.RWMutex      // 并发锁
 }
 
 var battleManagerInstance *BattleManager

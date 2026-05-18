@@ -11,21 +11,21 @@ import (
 )
 
 type DBConfig struct {
-	Host         string
-	Port         int
-	User         string
-	Password     string
-	DBName       string
-	MaxOpenConns int
-	MaxIdleConns int
+	Host         string // 数据库主机地址
+	Port         int    // 数据库端口
+	User         string // 数据库用户名
+	Password     string // 数据库密码
+	DBName       string // 数据库名称
+	MaxOpenConns int    // 最大打开连接数
+	MaxIdleConns int    // 最大空闲连接数
 }
 
 type Database struct {
-	db          *gorm.DB
-	config      DBConfig
-	batchQ      []interface{}
-	batchMu     sync.Mutex
-	flushTicker *time.Ticker
+	db          *gorm.DB      // GORM数据库实例
+	config      DBConfig      // 数据库配置
+	batchQ      []interface{} // 批量操作队列
+	batchMu     sync.Mutex    // 批量操作互斥锁
+	flushTicker *time.Ticker  // 批量刷新定时器
 }
 
 func NewDatabase(config DBConfig) (*Database, error) {
@@ -143,12 +143,12 @@ func (d *Database) ForceFlush() {
 }
 
 type AccountData struct {
-	ID        int64  `gorm:"primaryKey"`
-	Account   string `gorm:"size:64;unique"`
-	Password  string `gorm:"size:256"`
-	Salt      string `gorm:"size:64"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        int64     `gorm:"primaryKey"`     // 账号ID
+	Account   string    `gorm:"size:64;unique"` // 账号名
+	Password  string    `gorm:"size:256"`       // 密码（已加密）
+	Salt      string    `gorm:"size:64"`        // 加密盐
+	CreatedAt time.Time // 创建时间
+	UpdatedAt time.Time // 更新时间
 }
 
 func (a *AccountData) CheckPassword(password string) bool {
@@ -156,46 +156,46 @@ func (a *AccountData) CheckPassword(password string) bool {
 }
 
 type PlayerData struct {
-	ID         int64  `gorm:"primaryKey"`
-	Name       string `gorm:"size:64"`
-	AccountID  int64
-	Level      int32
-	Exp        int64
-	PosX       float64
-	PosY       float64
-	PosZ       float64
-	Health     int32
-	MaxHealth  int32
-	Mana       int32
-	MaxMana    int32
-	Stamina    int32
-	MaxStamina int32
-	TeamID     int64
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID         int64     `gorm:"primaryKey"` // 玩家ID
+	Name       string    `gorm:"size:64"`    // 玩家名称
+	AccountID  int64     // 所属账号ID
+	Level      int32     // 玩家等级
+	Exp        int64     // 当前经验值
+	PosX       float64   // X坐标
+	PosY       float64   // Y坐标
+	PosZ       float64   // Z坐标
+	Health     int32     // 当前生命值
+	MaxHealth  int32     // 最大生命值
+	Mana       int32     // 当前魔法值
+	MaxMana    int32     // 最大魔法值
+	Stamina    int32     // 当前体力值
+	MaxStamina int32     // 最大体力值
+	TeamID     int64     // 队伍ID
+	CreatedAt  time.Time // 创建时间
+	UpdatedAt  time.Time // 更新时间
 }
 
 type InventoryItem struct {
-	ID        int64 `gorm:"primaryKey"`
-	PlayerID  int64
-	ItemID    int64
-	Slot      int32
-	Count     int32
-	Level     int32
-	UpdatedAt time.Time
+	ID        int64     `gorm:"primaryKey"` // 物品实例ID
+	PlayerID  int64     // 所属玩家ID
+	ItemID    int64     // 物品配置ID
+	Slot      int32     // 背包槽位
+	Count     int32     // 物品数量
+	Level     int32     // 物品强化等级
+	UpdatedAt time.Time // 更新时间
 }
 
 type ItemConfig struct {
-	ID          int64 `gorm:"primaryKey"`
-	Name        string
-	Type        int32
-	EffectType  int32
-	EffectValue int32
-	Cooldown    int32
-	MaxStack    int32
-	Icon        string
-	Description string
-	CreatedAt   time.Time
+	ID          int64     `gorm:"primaryKey"` // 物品配置ID
+	Name        string    // 物品名称
+	Type        int32     // 物品类型
+	EffectType  int32     // 效果类型
+	EffectValue int32     // 效果值
+	Cooldown    int32     // 冷却时间(秒)
+	MaxStack    int32     // 最大堆叠数量
+	Icon        string    // 图标路径
+	Description string    // 物品描述
+	CreatedAt   time.Time // 创建时间
 }
 
 type QuestProgress struct {
@@ -208,45 +208,45 @@ type QuestProgress struct {
 }
 
 type AchievementData struct {
-	ID            int64 `gorm:"primaryKey"`
-	PlayerID      int64
-	AchievementID int64
-	Progress      int32
-	Completed     bool
-	UpdatedAt     time.Time
+	ID            int64     `gorm:"primaryKey"` // 成就数据ID
+	PlayerID      int64     // 玩家ID
+	AchievementID int64     // 成就ID
+	Progress      int32     // 当前进度
+	Completed     bool      // 是否已完成
+	UpdatedAt     time.Time // 更新时间
 }
 
 type GuildMember struct {
-	ID       int64 `gorm:"primaryKey"`
-	GuildID  int64
-	PlayerID int64
-	Role     int32
-	JoinedAt time.Time
+	ID       int64     `gorm:"primaryKey"` // 公会成员ID
+	GuildID  int64     // 公会ID
+	PlayerID int64     // 玩家ID
+	Role     int32     // 职位(0-普通成员, 1-官员, 2-会长)
+	JoinedAt time.Time // 加入时间
 }
 
 type ChatMessage struct {
-	ID        int64 `gorm:"primaryKey"`
-	ChannelID int64
-	SenderID  int64
-	Content   string `gorm:"size:512"`
-	SentAt    time.Time
+	ID        int64     `gorm:"primaryKey"` // 聊天消息ID
+	ChannelID int64     // 频道ID
+	SenderID  int64     // 发送者ID
+	Content   string    `gorm:"size:512"` // 消息内容
+	SentAt    time.Time // 发送时间
 }
 
 type BattleLog struct {
-	ID         int64 `gorm:"primaryKey"`
-	BattleID   int64
-	AttackerID int64
-	TargetID   int64
-	SkillID    int32
-	Damage     int32
-	Timestamp  time.Time
+	ID         int64     `gorm:"primaryKey"` // 战斗日志ID
+	BattleID   int64     // 战斗ID
+	AttackerID int64     // 攻击者ID
+	TargetID   int64     // 目标ID
+	SkillID    int32     // 技能ID(0表示普通攻击)
+	Damage     int32     // 造成伤害
+	Timestamp  time.Time // 时间戳
 }
 
 type LoginLog struct {
-	ID        int64 `gorm:"primaryKey"`
-	AccountID int64
-	IP        string `gorm:"size:64"`
-	LoginAt   time.Time
+	ID        int64     `gorm:"primaryKey"` // 登录日志ID
+	AccountID int64     // 账号ID
+	IP        string    `gorm:"size:64"` // 登录IP
+	LoginAt   time.Time // 登录时间
 }
 
 func (d *Database) InitTables() error {

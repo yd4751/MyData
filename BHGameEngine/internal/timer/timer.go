@@ -7,21 +7,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TimerTask 定时任务
 type TimerTask struct {
-	ID       int64
-	Delay    time.Duration
-	Interval time.Duration
-	Callback func()
-	RunAt    time.Time
-	Active   bool
-	mu       sync.RWMutex
+	ID       int64         // 任务ID
+	Delay    time.Duration // 初始延迟
+	Interval time.Duration // 重复间隔（0表示单次执行）
+	Callback func()        // 回调函数
+	RunAt    time.Time     // 下次执行时间
+	Active   bool          // 是否活跃
+	mu       sync.RWMutex  // 并发锁
 }
 
+// TimerManager 定时器管理器
 type TimerManager struct {
-	tasks     map[int64]*TimerTask
-	priorityQ []*TimerTask
-	mu        sync.Mutex
-	running   bool
+	tasks     map[int64]*TimerTask // 任务列表
+	priorityQ []*TimerTask         // 优先级队列（按执行时间排序）
+	mu        sync.Mutex           // 并发锁
+	running   bool                 // 是否运行中
 }
 
 func NewTimerManager() *TimerManager {
@@ -169,9 +171,10 @@ func (m *TimerManager) UpdateTaskDelay(id int64, delay time.Duration) {
 	m.mu.Unlock()
 }
 
+// RegionTimerManager 区域定时器管理器
 type RegionTimerManager struct {
-	timers map[string]*TimerManager
-	mu     sync.RWMutex
+	timers map[string]*TimerManager // 区域定时器列表（区域ID->定时器）
+	mu     sync.RWMutex             // 并发锁
 }
 
 func NewRegionTimerManager() *RegionTimerManager {

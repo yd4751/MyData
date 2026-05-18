@@ -10,7 +10,7 @@ import (
 )
 
 type DataClient struct {
-	connector *connector.Connector
+	connector *connector.Connector // 连接器，用于与数据服务通信
 }
 
 func NewDataClient(cluster *cluster.Cluster) *DataClient {
@@ -253,4 +253,27 @@ func (c *DataClient) GetItemConfig(itemID int64) (*msg.ItemConfig, error) {
 	jsonData, _ := json.Marshal(resp.Data)
 	json.Unmarshal(jsonData, itemConfig)
 	return itemConfig, nil
+}
+
+func (c *DataClient) UpdateItemCount(playerID int64, slot int32, count int32) error {
+	req := map[string]interface{}{
+		"player_id": playerID,
+		"slot":      slot,
+		"count":     count,
+	}
+	data, err := c.requestToDataService(msg.MSG_DB_INVENTORY_UPDATE, req)
+	if err != nil {
+		return err
+	}
+
+	var resp msg.DBResponse
+	err = json.Unmarshal(data, &resp)
+	if err != nil {
+		return err
+	}
+
+	if resp.Result != 0 {
+		return nil
+	}
+	return nil
 }

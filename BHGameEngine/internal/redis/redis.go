@@ -10,16 +10,16 @@ import (
 )
 
 type RedisConfig struct {
-	Addr     string
-	Password string
-	DB       int
-	PoolSize int
+	Addr     string // Redis地址
+	Password string // Redis密码
+	DB       int    // 数据库编号
+	PoolSize int    // 连接池大小
 }
 
 type RedisClient struct {
-	client *redis.Client
-	config RedisConfig
-	ctx    context.Context
+	client *redis.Client   // Redis客户端实例
+	config RedisConfig     // Redis配置
+	ctx    context.Context // 上下文
 }
 
 func NewRedisClient(config RedisConfig) *RedisClient {

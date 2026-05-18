@@ -9,29 +9,29 @@ import (
 )
 
 type Player struct {
-	ID           int64
-	Name         string
-	AccountID    int64
-	Level        int32
-	Exp          int64
-	Pos          worldmap.Vec3
-	Rotation     float64
-	Health       int32
-	MaxHealth    int32
-	Mana         int32
-	MaxMana      int32
-	Stamina      int32
-	MaxStamina   int32
-	State        PlayerState
-	ChunkPos     worldmap.ChunkPos
-	TeamID       int64
-	Buffs        []*Buff
-	Inventory    *item.Inventory
-	Strength     int32
-	Agility      int32
-	Intelligence int32
-	Defense      int32
-	mu           sync.RWMutex
+	ID           int64             // 玩家唯一标识符
+	Name         string            // 玩家名称
+	AccountID    int64             // 所属账号ID
+	Level        int32             // 玩家等级
+	Exp          int64             // 当前经验值
+	Pos          worldmap.Vec3     // 世界坐标位置
+	Rotation     float64           // 朝向角度
+	Health       int32             // 当前生命值
+	MaxHealth    int32             // 最大生命值
+	Mana         int32             // 当前魔法值
+	MaxMana      int32             // 最大魔法值
+	Stamina      int32             // 当前体力值
+	MaxStamina   int32             // 最大体力值
+	State        PlayerState       // 玩家状态
+	ChunkPos     worldmap.ChunkPos // 所在地图区块位置
+	TeamID       int64             // 队伍ID，0表示无队伍
+	Buffs        []*Buff           // 增益/减益效果列表
+	Inventory    *item.Inventory   // 背包系统
+	Strength     int32             // 力量属性（影响物理攻击）
+	Agility      int32             // 敏捷属性（影响攻速、闪避、暴击）
+	Intelligence int32             // 智力属性（影响魔法攻击、MP上限）
+	Defense      int32             // 防御属性（减少受到的伤害）
+	mu           sync.RWMutex      // 并发访问互斥锁
 }
 
 type PlayerState int32

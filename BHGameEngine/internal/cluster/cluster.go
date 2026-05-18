@@ -12,20 +12,22 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ServiceInfo 服务信息
 type ServiceInfo struct {
-	Name        string
-	Addr        string
-	CPUUsage    float64
-	MemoryUsage float64
-	Connections int
-	ProcessID   int
-	StartTime   time.Time
-	Metadata    map[string]string
+	Name        string            // 服务名称
+	Addr        string            // 服务地址
+	CPUUsage    float64           // CPU使用率(%)
+	MemoryUsage float64           // 内存使用率(%)
+	Connections int               // 连接数
+	ProcessID   int               // 进程ID
+	StartTime   time.Time         // 启动时间
+	Metadata    map[string]string // 元数据
 }
 
+// Cluster 集群管理器
 type Cluster struct {
-	etcd     *clientv3.Client
-	services map[string][]*ServiceInfo
+	etcd     *clientv3.Client          // etcd客户端
+	services map[string][]*ServiceInfo // 服务列表
 }
 
 func NewCluster(etcdAddr string) (*Cluster, error) {

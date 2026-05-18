@@ -8,9 +8,9 @@ import (
 )
 
 type Logger struct {
-	serviceName      string
-	cluster          *cluster.Cluster
-	logServerRunning bool
+	serviceName      string           // 服务名称
+	cluster          *cluster.Cluster // 集群管理器
+	logServerRunning bool             // 日志服务器发现是否运行中
 }
 
 func NewLogger(serviceName string) *Logger {

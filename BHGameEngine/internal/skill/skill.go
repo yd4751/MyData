@@ -8,96 +8,96 @@ import (
 	"github.com/openworld-server/pkg/snowflake"
 )
 
-type SkillType int32
+type SkillType int32 // 技能类型
 
 const (
-	SkillTypeActive  SkillType = 1
-	SkillTypePassive SkillType = 2
-	SkillTypeCombo   SkillType = 3
+	SkillTypeActive  SkillType = 1 // 主动技能，需要手动释放
+	SkillTypePassive SkillType = 2 // 被动技能，持续生效
+	SkillTypeCombo   SkillType = 3 // 连招技能，需按特定顺序释放
 )
 
-type SkillClass int32
+type SkillClass int32 // 技能分类
 
 const (
-	SkillClassPhysical SkillClass = 1
-	SkillClassMagic    SkillClass = 2
-	SkillClassHealing  SkillClass = 3
-	SkillClassBuff     SkillClass = 4
-	SkillClassDebuff   SkillClass = 5
+	SkillClassPhysical SkillClass = 1 // 物理类技能
+	SkillClassMagic    SkillClass = 2 // 魔法类技能
+	SkillClassHealing  SkillClass = 3 // 治疗类技能
+	SkillClassBuff     SkillClass = 4 // 增益类技能
+	SkillClassDebuff   SkillClass = 5 // 减益类技能
 )
 
-type TargetType int32
+type TargetType int32 // 目标类型
 
 const (
-	TargetTypeSingle TargetType = 1
-	TargetTypeMulti  TargetType = 2
-	TargetTypeArea   TargetType = 3
-	TargetTypeSelf   TargetType = 4
-	TargetTypeParty  TargetType = 5
-	TargetTypeEnemy  TargetType = 6
+	TargetTypeSingle TargetType = 1 // 单体目标
+	TargetTypeMulti  TargetType = 2 // 多个目标
+	TargetTypeArea   TargetType = 3 // 区域范围
+	TargetTypeSelf   TargetType = 4 // 自身
+	TargetTypeParty  TargetType = 5 // 队伍成员
+	TargetTypeEnemy  TargetType = 6 // 敌方目标
 )
 
-type EffectType int32
+type EffectType int32 // 效果类型
 
 const (
-	EffectTypeDamage       EffectType = 1
-	EffectTypeHeal         EffectType = 2
-	EffectTypeBuff         EffectType = 3
-	EffectTypeDebuff       EffectType = 4
-	EffectTypeDot          EffectType = 5
-	EffectTypeHot          EffectType = 6
-	EffectTypeStun         EffectType = 7
-	EffectTypeSilence      EffectType = 8
-	EffectTypeKnockback    EffectType = 9
-	EffectTypeSpeedBuff    EffectType = 10
-	EffectTypeDamageShield EffectType = 11
+	EffectTypeDamage       EffectType = 1  // 直接伤害
+	EffectTypeHeal         EffectType = 2  // 直接治疗
+	EffectTypeBuff         EffectType = 3  // 属性增益
+	EffectTypeDebuff       EffectType = 4  // 属性减益
+	EffectTypeDot          EffectType = 5  // 持续伤害(Damage over Time)
+	EffectTypeHot          EffectType = 6  // 持续治疗(Heal over Time)
+	EffectTypeStun         EffectType = 7  // 眩晕控制
+	EffectTypeSilence      EffectType = 8  // 沉默控制
+	EffectTypeKnockback    EffectType = 9  // 击退效果
+	EffectTypeSpeedBuff    EffectType = 10 // 移动速度加成
+	EffectTypeDamageShield EffectType = 11 // 伤害护盾
 )
 
 type SkillConfig struct {
-	SkillID     int64
-	SkillName   string
-	SkillType   SkillType
-	SkillClass  SkillClass
-	MaxLevel    int
-	Cooldown    int
-	ManaCost    int
-	Range       float32
-	TargetType  TargetType
-	Description string
-	Effects     []*EffectConfig
+	SkillID     int64           // 技能唯一ID
+	SkillName   string          // 技能名称
+	SkillType   SkillType       // 技能类型（主动/被动/连招）
+	SkillClass  SkillClass      // 技能分类（物理/魔法/治疗等）
+	MaxLevel    int             // 最高等级
+	Cooldown    int             // 冷却时间(毫秒)
+	ManaCost    int             // 魔法消耗
+	Range       float32         // 技能射程
+	TargetType  TargetType      // 目标类型
+	Description string          // 技能描述
+	Effects     []*EffectConfig // 技能效果列表
 }
 
 type EffectConfig struct {
-	EffectID     int64
-	EffectType   EffectType
-	Value        float32
-	Duration     int
-	TickInterval int
-	StackCount   int
+	EffectID     int64      // 效果唯一ID
+	EffectType   EffectType // 效果类型
+	Value        float32    // 效果数值
+	Duration     int        // 持续时间(毫秒)，0表示瞬时
+	TickInterval int        // 周期性效果的触发间隔(毫秒)
+	StackCount   int        // 可堆叠层数
 }
 
 type PlayerSkill struct {
-	SkillID     int64
-	Level       int
-	LastCast    int64
-	CooldownEnd int64
-	IsUnlocked  bool
+	SkillID     int64 // 技能ID
+	Level       int   // 当前等级
+	LastCast    int64 // 上次释放时间戳(毫秒)
+	CooldownEnd int64 // 冷却结束时间戳(毫秒)
+	IsUnlocked  bool  // 是否已解锁
 }
 
 type ComboSequence struct {
-	SkillIDs    []int64
-	NextIndex   int
-	LastTime    int64
-	MaxDelay    int
-	BonusEffect *EffectConfig
+	SkillIDs    []int64       // 连招技能ID序列
+	NextIndex   int           // 当前应释放的技能索引
+	LastTime    int64         // 上一个技能释放时间戳
+	MaxDelay    int           // 连招最大间隔时间(毫秒)
+	BonusEffect *EffectConfig // 连招完成后的额外奖励效果
 }
 
 type SkillManager struct {
-	skillConfigs   map[int64]*SkillConfig
-	playerSkills   map[int64]map[int64]*PlayerSkill
-	comboSequences map[int64]*ComboSequence
-	timerManager   *timer.TimerManager
-	mu             sync.RWMutex
+	skillConfigs   map[int64]*SkillConfig           // 技能配置表
+	playerSkills   map[int64]map[int64]*PlayerSkill // 玩家技能状态（玩家ID -> 技能ID -> 技能状态）
+	comboSequences map[int64]*ComboSequence         // 玩家连招序列（玩家ID -> 连招状态）
+	timerManager   *timer.TimerManager              // 定时器管理器
+	mu             sync.RWMutex                     // 并发访问互斥锁
 }
 
 func (m *SkillManager) TimerManager() *timer.TimerManager {
@@ -400,9 +400,10 @@ func (m *SkillManager) SetCooldown(playerID int64, skillID int64, cooldownMs int
 	playerSkill.LastCast = now
 }
 
+// SkillCaster 技能释放者接口
 type SkillCaster interface {
-	GetID() int64
-	ConsumeMana(amount int32) bool
+	GetID() int64                  // 获取释放者ID
+	ConsumeMana(amount int32) bool // 消耗魔法值，返回是否成功
 }
 
 func (m *SkillManager) CastSkill(caster SkillCaster, skillID int64, targetID int64) (*SkillResult, error) {
@@ -566,7 +567,8 @@ func GetTargetEntity(targetID int64) EntityTarget {
 	return nil
 }
 
+// EntityTarget 技能目标实体接口
 type EntityTarget interface {
-	TakeDamage(damage int32)
-	Heal(amount int32)
+	TakeDamage(damage int32) // 受到伤害
+	Heal(amount int32)       // 恢复生命值
 }
