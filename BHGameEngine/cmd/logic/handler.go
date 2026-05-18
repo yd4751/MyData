@@ -2,154 +2,355 @@ package main
 
 import (
 	"encoding/json"
+	"net"
 
+	"github.com/openworld-server/internal/db"
+	"github.com/openworld-server/internal/log"
 	"github.com/openworld-server/internal/msg"
 	"github.com/openworld-server/internal/network"
-	"github.com/openworld-server/internal/player"
-	"github.com/openworld-server/pkg/logger"
+	"github.com/openworld-server/internal/redis"
 )
 
 type LogicHandler struct {
+	database    *db.Database
+	redisClient *redis.RedisClient
 }
 
-func NewLogicHandler() *LogicHandler {
-	return &LogicHandler{}
+func NewLogicHandler(database *db.Database, redisClient *redis.RedisClient) *LogicHandler {
+	return &LogicHandler{
+		database:    database,
+		redisClient: redisClient,
+	}
 }
 
 func (h *LogicHandler) Handle(msgObj *network.Message) {
-	logger.Info("Logic received message - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+	log.Info("Logic server received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), "), NodeType:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
 
 	switch msgObj.ID {
+	case msg.MSG_PLAYER_INFO_REQ:
+		h.handlePlayerInfo(msgObj)
 	case msg.MSG_PLAYER_MOVE_REQ:
-		h.handlePlayerMoveRequest(msgObj)
-	case msg.MSG_ATTACK_REQ:
-		h.handleAttackRequest(msgObj)
-	case msg.MSG_SKILL_REQ:
-		h.handleSkillRequest(msgObj)
+		h.handlePlayerMove(msgObj)
+	case msg.MSG_INVENTORY_REQ:
+		h.handleInventoryRequest(msgObj)
 	case msg.MSG_ITEM_USE_REQ:
 		h.handleItemUseRequest(msgObj)
+	default:
+		log.Warn("Unknown message ID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
 	}
 }
 
-func (h *LogicHandler) handlePlayerMoveRequest(msgObj *network.Message) {
-	logger.Info("Handling player move request")
-
-	req := &msg.PlayerMoveRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal player move request:", err)
-		return
-	}
-
-	res := &msg.PlayerMoveResponse{
-		Result:  0,
-		Message: "success",
-		PosX:    req.TargetX,
-		PosY:    req.TargetY,
-	}
-
-	data, err := json.Marshal(res)
+func (h *LogicHandler) handlePlayerInfo(msgObj *network.Message) {
+	var req msg.PlayerInfoRequest
+	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
-		logger.Error("Failed to marshal player move response:", err)
+		log.Error("Failed to parse player info request:", err)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Invalid request")
 		return
 	}
 
-	msgObj.Session.Send(msg.MSG_PLAYER_MOVE_RES, msg.NodeTypeLogic, data)
-	logger.Info("Player move response sent - PlayerID:", req.PlayerID, "Pos:", req.TargetX, ",", req.TargetY)
-}
+	log.Info("Player info request: PlayerID=", req.PlayerID)
 
-func (h *LogicHandler) handleAttackRequest(msgObj *network.Message) {
-	logger.Info("Handling attack request")
-
-	req := &msg.AttackRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal attack request:", err)
+	player, err := h.database.GetPlayerByID(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get player:", err)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Player not found")
 		return
 	}
 
-	res := &msg.AttackResponse{
+	if player == nil {
+		log.Warn("Player not found: PlayerID=", req.PlayerID)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Player not found")
+		return
+	}
+
+	resp := msg.PlayerInfoResponse{
 		Result:     0,
-		Message:    "success",
-		AttackerID: req.PlayerID,
-		TargetID:   req.TargetID,
-		Damage:     20,
-		TargetHP:   60,
+		PlayerID:   player.ID,
+		PlayerName: player.Name,
+		Level:      player.Level,
+		Exp:        player.Exp,
+		Health:     player.Health,
+		MaxHealth:  player.MaxHealth,
+		Mana:       player.Mana,
+		MaxMana:    player.MaxMana,
+		PositionX:  player.PosX,
+		PositionY:  player.PosY,
 	}
 
-	data, err := json.Marshal(res)
-	if err != nil {
-		logger.Error("Failed to marshal attack response:", err)
-		return
-	}
-
-	msgObj.Session.Send(msg.MSG_ATTACK_RES, msg.NodeTypeLogic, data)
-	logger.Info("Attack response sent - Attacker:", req.PlayerID, "Target:", req.TargetID)
+	log.Info("Player info response sent: PlayerID=", req.PlayerID)
+	h.sendResponse(msgObj.Session, msg.MSG_PLAYER_INFO_RES, resp)
 }
 
-func (h *LogicHandler) handleSkillRequest(msgObj *network.Message) {
-	logger.Info("Handling skill request")
-
-	req := &msg.SkillRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal skill request:", err)
-		return
-	}
-
-	res := &msg.SkillResponse{
-		Result:   0,
-		Message:  "success",
-		SkillID:  req.SkillID,
-		TargetID: req.TargetID,
-		Damage:   35,
-		TargetHP: 45,
-	}
-
-	data, err := json.Marshal(res)
+func (h *LogicHandler) handlePlayerMove(msgObj *network.Message) {
+	var req msg.PlayerMoveRequest
+	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
-		logger.Error("Failed to marshal skill response:", err)
+		log.Error("Failed to parse player move request:", err)
+		h.sendMoveError(msgObj.Session, "Invalid request")
 		return
 	}
 
-	msgObj.Session.Send(msg.MSG_SKILL_RES, msg.NodeTypeLogic, data)
-	logger.Info("Skill response sent - PlayerID:", req.PlayerID, "SkillID:", req.SkillID)
+	log.Info("Player move request: PlayerID=", req.PlayerID, ", TargetX=", req.TargetX, ", TargetY=", req.TargetY)
+
+	err = h.database.UpdatePlayerPosition(req.PlayerID, req.TargetX, req.TargetY)
+	if err != nil {
+		log.Error("Failed to update player position:", err)
+		h.sendMoveError(msgObj.Session, "Internal error")
+		return
+	}
+
+	resp := msg.PlayerMoveResponse{
+		Result: 0,
+		PosX:   req.TargetX,
+		PosY:   req.TargetY,
+	}
+
+	log.Info("Player move response sent: PlayerID=", req.PlayerID)
+	h.sendMoveResponse(msgObj.Session, resp)
+}
+
+func (h *LogicHandler) sendError(conn net.Conn, msgID uint32, message string) {
+	resp := msg.PlayerInfoResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendResponse(conn, msgID, resp)
+}
+
+func (h *LogicHandler) sendResponse(conn net.Conn, msgID uint32, data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal response:", err)
+		return
+	}
+
+	log.Debug("Sending response - MsgID:", msgID, "(", msg.GetMsgName(msgID), "), Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msgID, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send response:", err)
+	}
+}
+
+func (h *LogicHandler) sendMoveError(conn net.Conn, message string) {
+	resp := msg.PlayerMoveResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendMoveResponse(conn, resp)
+}
+
+func (h *LogicHandler) sendMoveResponse(conn net.Conn, data msg.PlayerMoveResponse) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal response:", err)
+		return
+	}
+
+	log.Debug("Sending move response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_PLAYER_MOVE_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send response:", err)
+	}
+}
+
+func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
+	var req msg.InventoryRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse inventory request:", err)
+		h.sendInventoryError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	log.Info("Inventory request: PlayerID=", req.PlayerID)
+
+	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get player inventory:", err)
+		h.sendInventoryError(msgObj.Session, "Internal error")
+		return
+	}
+
+	items := make([]msg.ItemInfo, 0)
+	for _, item := range inventory {
+		itemConfig, err := h.database.GetItemConfig(item.ItemID)
+		if err != nil {
+			log.Warn("Item config not found for item ID:", item.ItemID)
+			items = append(items, msg.ItemInfo{
+				ItemID:      uint32(item.ItemID),
+				Name:        "未知道具",
+				Icon:        "unknown",
+				Count:       item.Count,
+				Position:    item.Slot,
+				Description: "未知道具",
+			})
+			continue
+		}
+
+		items = append(items, msg.ItemInfo{
+			ItemID:      uint32(item.ItemID),
+			Name:        itemConfig.Name,
+			Icon:        itemConfig.Icon,
+			Count:       item.Count,
+			Position:    item.Slot,
+			Description: itemConfig.Description,
+		})
+	}
+
+	resp := msg.InventoryResponse{
+		Result: 0,
+		Items:  items,
+	}
+
+	log.Info("Inventory response sent: PlayerID=", req.PlayerID, ", ItemCount=", len(items))
+	h.sendInventoryResponse(msgObj.Session, resp)
 }
 
 func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
-	logger.Info("Handling item use request")
-
-	req := &msg.ItemUseRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal item use request:", err)
+	var req msg.ItemUseRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse item use request:", err)
+		h.sendItemUseError(msgObj.Session, "Invalid request")
 		return
 	}
 
-	playerManager := player.NewPlayerManager()
-	p, ok := playerManager.GetPlayer(req.PlayerID)
-	if !ok {
-		res := &msg.ItemUseResponse{
-			Result:  -1,
-			Message: "玩家不存在",
+	log.Info("Item use request: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID, ", Position=", req.Position)
+
+	playerData, err := h.database.GetPlayerByID(req.PlayerID)
+	if err != nil || playerData == nil {
+		log.Error("Player not found:", req.PlayerID)
+		h.sendItemUseError(msgObj.Session, "Player not found")
+		return
+	}
+
+	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get inventory:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	var targetItem *db.InventoryItem
+	for _, item := range inventory {
+		if item.Slot == req.Position {
+			targetItem = item
+			break
 		}
-		data, _ := json.Marshal(res)
-		msgObj.Session.Send(msg.MSG_ITEM_USE_RES, msg.NodeTypeLogic, data)
+	}
+
+	if targetItem == nil {
+		log.Warn("Item not found in slot:", req.Position)
+		h.sendItemUseError(msgObj.Session, "Item not found")
 		return
 	}
 
-	success, message := p.UseItem(req.Position)
+	if targetItem.Count <= 0 {
+		log.Warn("Item count is zero:", req.Position)
+		h.sendItemUseError(msgObj.Session, "Item count is zero")
+		return
+	}
 
-	res := &msg.ItemUseResponse{
+	itemConfig, err := h.database.GetItemConfig(targetItem.ItemID)
+	if err != nil {
+		log.Error("Item config not found:", targetItem.ItemID)
+		h.sendItemUseError(msgObj.Session, "Item config not found")
+		return
+	}
+
+	if itemConfig.Type != 1 {
+		log.Warn("Item is not consumable:", targetItem.ItemID)
+		h.sendItemUseError(msgObj.Session, "Item is not consumable")
+		return
+	}
+
+	switch itemConfig.EffectType {
+	case 1:
+		playerData.Health += itemConfig.EffectValue
+		if playerData.Health > playerData.MaxHealth {
+			playerData.Health = playerData.MaxHealth
+		}
+	case 2:
+		playerData.Mana += itemConfig.EffectValue
+		if playerData.Mana > playerData.MaxMana {
+			playerData.Mana = playerData.MaxMana
+		}
+	default:
+		log.Warn("Unknown effect type:", itemConfig.EffectType)
+		h.sendItemUseError(msgObj.Session, "Unknown effect type")
+		return
+	}
+
+	err = h.database.SavePlayerData(playerData)
+	if err != nil {
+		log.Error("Failed to save player data:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	targetItem.Count--
+	if targetItem.Count <= 0 {
+		err = h.database.GetDB().Delete(targetItem).Error
+	} else {
+		err = h.database.GetDB().Save(targetItem).Error
+	}
+
+	if err != nil {
+		log.Error("Failed to update inventory:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	resp := msg.ItemUseResponse{
 		Result:  0,
+		Message: "Use success",
+	}
+
+	log.Info("Item use response sent: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID)
+	h.sendItemUseResponse(msgObj.Session, resp)
+}
+
+func (h *LogicHandler) sendInventoryError(conn net.Conn, message string) {
+	resp := msg.InventoryResponse{
+		Result:  1,
 		Message: message,
 	}
-	if !success {
-		res.Result = -1
-	}
+	h.sendInventoryResponse(conn, resp)
+}
 
-	data, err := json.Marshal(res)
+func (h *LogicHandler) sendInventoryResponse(conn net.Conn, data msg.InventoryResponse) {
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		logger.Error("Failed to marshal item use response:", err)
+		log.Error("Failed to marshal inventory response:", err)
 		return
 	}
 
-	msgObj.Session.Send(msg.MSG_ITEM_USE_RES, msg.NodeTypeLogic, data)
-	logger.Info("Item use response sent - PlayerID:", req.PlayerID, "ItemID:", req.ItemID, "Result:", success)
+	log.Debug("Sending inventory response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_INVENTORY_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send inventory response:", err)
+	}
+}
+
+func (h *LogicHandler) sendItemUseError(conn net.Conn, message string) {
+	resp := msg.ItemUseResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendItemUseResponse(conn, resp)
+}
+
+func (h *LogicHandler) sendItemUseResponse(conn net.Conn, data msg.ItemUseResponse) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal item use response:", err)
+		return
+	}
+
+	log.Debug("Sending item use response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_ITEM_USE_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send item use response:", err)
+	}
 }

@@ -2,83 +2,317 @@ package main
 
 import (
 	"encoding/json"
+	"net"
+	"strconv"
+	"time"
 
+	"github.com/openworld-server/internal/dataclient"
+	"github.com/openworld-server/internal/log"
 	"github.com/openworld-server/internal/msg"
 	"github.com/openworld-server/internal/network"
-	"github.com/openworld-server/pkg/logger"
+	"github.com/openworld-server/internal/redis"
+	"github.com/openworld-server/pkg/snowflake"
 )
 
 type LoginHandler struct {
+	dataClient  *dataclient.DataClient
+	redisClient *redis.RedisClient
 }
 
-func NewLoginHandler() *LoginHandler {
-	return &LoginHandler{}
+func NewLoginHandler(dataClient *dataclient.DataClient, redisClient *redis.RedisClient) *LoginHandler {
+	return &LoginHandler{
+		dataClient:  dataClient,
+		redisClient: redisClient,
+	}
 }
 
 func (h *LoginHandler) Handle(msgObj *network.Message) {
-	logger.Info("Login received message - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+	log.Info("Login server received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), "), NodeType:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
 
 	switch msgObj.ID {
 	case msg.MSG_LOGIN_REQ:
-		h.handleLoginRequest(msgObj)
+		h.handleLogin(msgObj)
 	case msg.MSG_REGISTER_REQ:
-		h.handleRegisterRequest(msgObj)
+		h.handleRegister(msgObj)
+	case msg.MSG_LOGOUT_REQ:
+		h.handleLogout(msgObj)
+	case msg.MSG_PLAYER_INFO_REQ:
+		h.handlePlayerInfoRequest(msgObj)
+	default:
+		log.Warn("Unknown message ID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
 	}
 }
 
-func (h *LoginHandler) handleLoginRequest(msgObj *network.Message) {
-	logger.Info("Handling login request")
-
-	req := &msg.LoginRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal login request:", err)
+func (h *LoginHandler) handleLogin(msgObj *network.Message) {
+	var req msg.LoginRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse login request:", err)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Invalid request")
 		return
 	}
 
-	logger.Info("Login attempt - Account:", req.Account)
+	log.Info("Login request: Account=", req.Account, ", DeviceID=", req.DeviceID)
 
-	res := &msg.LoginResponse{
+	account, err := h.dataClient.GetAccount(req.Account)
+	if err != nil {
+		log.Error("Failed to get account:", err)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Account not found")
+		return
+	}
+
+	if account == nil {
+		log.Warn("Account not found: ", req.Account)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Account not found")
+		return
+	}
+
+	if account.Password != req.Password+account.Salt {
+		log.Warn("Invalid password for account: ", req.Account)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Invalid password")
+		return
+	}
+
+	sessionID := generateSessionID()
+	err = h.redisClient.SetSession(sessionID, account.ID, 24*time.Hour)
+	if err != nil {
+		log.Error("Failed to set session:", err)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Internal error")
+		return
+	}
+
+	log.Info("Session created: SessionID=", sessionID, ", AccountID=", account.ID)
+
+	player, err := h.dataClient.GetPlayerByAccountID(account.ID)
+	if err != nil {
+		log.Error("Failed to get player:", err)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Internal error")
+		return
+	}
+
+	resp := msg.LoginResponse{
+		Result:     0,
+		SessionID:  sessionID,
+		PlayerID:   player.ID,
+		PlayerName: player.Name,
+		Level:      player.Level,
+		Health:     player.Health,
+	}
+
+	log.Info("Login successful: Account=", req.Account, ", PlayerID=", player.ID)
+	h.sendResponse(msgObj.Session, msg.MSG_LOGIN_RES, resp)
+}
+
+func (h *LoginHandler) handleRegister(msgObj *network.Message) {
+	var req msg.RegisterRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse register request:", err)
+		h.sendRegisterError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	log.Info("Register request: Account=", req.Account)
+
+	exists, err := h.dataClient.AccountExists(req.Account)
+	if err != nil {
+		log.Error("Failed to check account:", err)
+		h.sendRegisterError(msgObj.Session, "Internal error")
+		return
+	}
+
+	if exists {
+		log.Warn("Account already exists: ", req.Account)
+		h.sendRegisterError(msgObj.Session, "Account already exists")
+		return
+	}
+
+	err = h.dataClient.CreateAccount(req.Account, req.Password)
+	if err != nil {
+		log.Error("Failed to create account:", err)
+		h.sendRegisterError(msgObj.Session, "Failed to create account")
+		return
+	}
+
+	account, err := h.dataClient.GetAccount(req.Account)
+	if err != nil {
+		log.Error("Failed to get new account:", err)
+		h.sendRegisterError(msgObj.Session, "Internal error")
+		return
+	}
+
+	playerID := snowflake.GenerateID()
+	err = h.dataClient.CreatePlayer(playerID, account.ID, req.Account)
+	if err != nil {
+		log.Error("Failed to create player:", err)
+		h.sendRegisterError(msgObj.Session, "Failed to create player")
+		return
+	}
+
+	log.Info("Register successful: Account=", req.Account, ", PlayerID=", playerID)
+
+	resp := msg.RegisterResponse{
+		Result:  0,
+		Message: "Register success",
+	}
+
+	h.sendRegisterResponse(msgObj.Session, resp)
+}
+
+func (h *LoginHandler) handleLogout(msgObj *network.Message) {
+	var req msg.LogoutRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse logout request:", err)
+		return
+	}
+
+	log.Info("Logout request: SessionID=", req.SessionID)
+
+	err = h.redisClient.DeleteSession(req.SessionID)
+	if err != nil {
+		log.Error("Failed to delete session:", err)
+		return
+	}
+
+	log.Info("Logout successful: SessionID=", req.SessionID)
+}
+
+func (h *LoginHandler) handlePlayerInfoRequest(msgObj *network.Message) {
+	log.Info("Handling player info request")
+
+	var req msg.PlayerInfoRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to unmarshal player info request:", err)
+		h.sendPlayerInfoError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	playerIDStr, err := h.redisClient.GetSession(req.SessionID)
+	if err != nil {
+		log.Error("Failed to get player ID from session:", err)
+		h.sendPlayerInfoError(msgObj.Session, "Invalid session")
+		return
+	}
+
+	if playerIDStr == "" {
+		log.Warn("Session not found: ", req.SessionID)
+		h.sendPlayerInfoError(msgObj.Session, "Invalid session")
+		return
+	}
+
+	playerID, err := strconv.ParseInt(playerIDStr, 10, 64)
+	if err != nil {
+		log.Error("Failed to parse player ID:", err)
+		h.sendPlayerInfoError(msgObj.Session, "Internal error")
+		return
+	}
+
+	player, err := h.dataClient.GetPlayerByID(playerID)
+	if err != nil {
+		log.Error("Failed to get player:", err)
+		h.sendPlayerInfoError(msgObj.Session, "Internal error")
+		return
+	}
+
+	if player == nil {
+		log.Warn("Player not found: ", playerID)
+		h.sendPlayerInfoError(msgObj.Session, "Player not found")
+		return
+	}
+
+	resp := msg.PlayerInfoResponse{
 		Result:     0,
 		Message:    "success",
-		SessionID:  "session_" + req.Account,
-		PlayerID:   10001,
-		PlayerName: req.Account,
-		Level:      1,
-		Health:     100,
+		PlayerID:   player.ID,
+		PlayerName: player.Name,
+		Level:      player.Level,
+		Exp:        player.Exp,
+		Health:     player.Health,
+		MaxHealth:  player.MaxHealth,
+		Mana:       player.Mana,
+		MaxMana:    player.MaxMana,
+		PositionX:  player.PosX,
+		PositionY:  player.PosY,
 	}
 
-	data, err := json.Marshal(res)
-	if err != nil {
-		logger.Error("Failed to marshal login response:", err)
-		return
-	}
-
-	msgObj.Session.Send(msg.MSG_LOGIN_RES, msg.NodeTypeLogin, data)
-	logger.Info("Login success - Account:", req.Account, "PlayerID:", res.PlayerID)
+	log.Info("Player info request successful: PlayerID=", player.ID)
+	h.sendPlayerInfoResponse(msgObj.Session, resp)
 }
 
-func (h *LoginHandler) handleRegisterRequest(msgObj *network.Message) {
-	logger.Info("Handling register request")
-
-	req := &msg.RegisterRequest{}
-	if err := json.Unmarshal(msgObj.Data, req); err != nil {
-		logger.Error("Failed to unmarshal register request:", err)
-		return
+func (h *LoginHandler) sendPlayerInfoError(conn net.Conn, message string) {
+	resp := msg.PlayerInfoResponse{
+		Result:  1,
+		Message: message,
 	}
+	h.sendResponse(conn, msg.MSG_PLAYER_INFO_RES, resp)
+}
 
-	logger.Info("Register attempt - Account:", req.Account)
-
-	res := &msg.RegisterResponse{
-		Result:  0,
-		Message: "success",
-	}
-
-	data, err := json.Marshal(res)
+func (h *LoginHandler) sendPlayerInfoResponse(conn net.Conn, resp msg.PlayerInfoResponse) {
+	data, err := json.Marshal(resp)
 	if err != nil {
-		logger.Error("Failed to marshal register response:", err)
+		log.Error("Failed to marshal player info response:", err)
 		return
 	}
+	err = network.SendRawMessage(conn, msg.MSG_PLAYER_INFO_RES, msg.NodeTypeData, data)
+	if err != nil {
+		log.Error("Failed to send player info response:", err)
+	}
+}
 
-	msgObj.Session.Send(msg.MSG_REGISTER_RES, msg.NodeTypeLogin, data)
-	logger.Info("Register success - Account:", req.Account)
+func (h *LoginHandler) sendError(conn net.Conn, msgID uint32, message string) {
+	type errorResponse struct {
+		Result  int    `json:"result"`
+		Message string `json:"message"`
+	}
+	resp := errorResponse{
+		Result:  1,
+		Message: message,
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		log.Error("Failed to marshal error response:", err)
+		return
+	}
+	err = network.SendRawMessage(conn, msgID, msg.NodeTypeData, data)
+	if err != nil {
+		log.Error("Failed to send error response:", err)
+	}
+}
+
+func (h *LoginHandler) sendResponse(conn net.Conn, msgID uint32, resp interface{}) {
+	data, err := json.Marshal(resp)
+	if err != nil {
+		log.Error("Failed to marshal response:", err)
+		return
+	}
+	err = network.SendRawMessage(conn, msgID, msg.NodeTypeData, data)
+	if err != nil {
+		log.Error("Failed to send response:", err)
+	}
+}
+
+func (h *LoginHandler) sendRegisterError(conn net.Conn, message string) {
+	resp := msg.RegisterResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendRegisterResponse(conn, resp)
+}
+
+func (h *LoginHandler) sendRegisterResponse(conn net.Conn, resp msg.RegisterResponse) {
+	data, err := json.Marshal(resp)
+	if err != nil {
+		log.Error("Failed to marshal register response:", err)
+		return
+	}
+	err = network.SendRawMessage(conn, msg.MSG_REGISTER_RES, msg.NodeTypeData, data)
+	if err != nil {
+		log.Error("Failed to send register response:", err)
+	}
+}
+
+func generateSessionID() string {
+	return snowflake.GenerateIDString()
 }

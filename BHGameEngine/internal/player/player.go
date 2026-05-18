@@ -2,77 +2,35 @@ package player
 
 import (
 	"sync"
-	"time"
 
+	"github.com/openworld-server/internal/item"
 	"github.com/openworld-server/internal/worldmap"
 )
 
-type ItemType int32
-
-const (
-	ItemTypeConsumable ItemType = 1
-	ItemTypeEquipment  ItemType = 2
-	ItemTypeMaterial   ItemType = 3
-	ItemTypeQuest      ItemType = 4
-)
-
-type ItemConfig struct {
-	ID          int64
-	Name        string
-	Type        ItemType
-	EffectType  int32
-	EffectValue int32
-	Cooldown    int32
-	MaxStack    int32
-}
-
-var ItemConfigs = map[int64]*ItemConfig{
-	1001: {ID: 1001, Name: "小型生命药水", Type: ItemTypeConsumable, EffectType: 1, EffectValue: 50, Cooldown: 0, MaxStack: 20},
-	1002: {ID: 1002, Name: "中型生命药水", Type: ItemTypeConsumable, EffectType: 1, EffectValue: 100, Cooldown: 0, MaxStack: 20},
-	1003: {ID: 1003, Name: "大型生命药水", Type: ItemTypeConsumable, EffectType: 1, EffectValue: 200, Cooldown: 0, MaxStack: 20},
-	2001: {ID: 2001, Name: "小型魔法药水", Type: ItemTypeConsumable, EffectType: 2, EffectValue: 30, Cooldown: 0, MaxStack: 20},
-	2002: {ID: 2002, Name: "中型魔法药水", Type: ItemTypeConsumable, EffectType: 2, EffectValue: 60, Cooldown: 0, MaxStack: 20},
-	3001: {ID: 3001, Name: "力量药剂", Type: ItemTypeConsumable, EffectType: 3, EffectValue: 10, Cooldown: 300, MaxStack: 10},
-	3002: {ID: 3002, Name: "敏捷药剂", Type: ItemTypeConsumable, EffectType: 4, EffectValue: 10, Cooldown: 300, MaxStack: 10},
-}
-
-type InventoryItem struct {
-	ItemID     int64
-	Slot       int32
-	Count      int32
-	Level      int32
-	ExpireTime int64
-}
-
-type CooldownEntry struct {
-	ItemID  int64
-	EndTime int64
-}
-
 type Player struct {
-	ID         int64
-	Name       string
-	AccountID  int64
-	Level      int32
-	Exp        int64
-	Pos        worldmap.Vec3
-	Rotation   float64
-	Health     int32
-	MaxHealth  int32
-	Mana       int32
-	MaxMana    int32
-	Stamina    int32
-	MaxStamina int32
-	State      PlayerState
-	ChunkPos   worldmap.ChunkPos
-	TeamID     int64
-	Buffs      []*Buff
-	Equipments []*Equipment
-	Inventory  map[int32]*InventoryItem
-	Cooldowns  map[int64]*CooldownEntry
-	Strength   int32
-	Agility    int32
-	mu         sync.RWMutex
+	ID           int64
+	Name         string
+	AccountID    int64
+	Level        int32
+	Exp          int64
+	Pos          worldmap.Vec3
+	Rotation     float64
+	Health       int32
+	MaxHealth    int32
+	Mana         int32
+	MaxMana      int32
+	Stamina      int32
+	MaxStamina   int32
+	State        PlayerState
+	ChunkPos     worldmap.ChunkPos
+	TeamID       int64
+	Buffs        []*Buff
+	Inventory    *item.Inventory
+	Strength     int32
+	Agility      int32
+	Intelligence int32
+	Defense      int32
+	mu           sync.RWMutex
 }
 
 type PlayerState int32
@@ -94,18 +52,14 @@ type Buff struct {
 	EndTime int64
 }
 
-type Equipment struct {
-	Slot   int32
-	ItemID int64
-	Level  int32
-}
-
 type PlayerManager struct {
 	players map[int64]*Player
 	mu      sync.RWMutex
 }
 
 func NewPlayerManager() *PlayerManager {
+	item.LoadDefaultConfigs()
+	item.LoadDefaultRecipes()
 	return &PlayerManager{
 		players: make(map[int64]*Player),
 	}
@@ -113,26 +67,26 @@ func NewPlayerManager() *PlayerManager {
 
 func (m *PlayerManager) CreatePlayer(id int64, name string, accountID int64) *Player {
 	player := &Player{
-		ID:         id,
-		Name:       name,
-		AccountID:  accountID,
-		Level:      1,
-		Exp:        0,
-		Pos:        worldmap.Vec3{X: 0, Y: 0, Z: 0},
-		Rotation:   0,
-		Health:     100,
-		MaxHealth:  100,
-		Mana:       50,
-		MaxMana:    50,
-		Stamina:    100,
-		MaxStamina: 100,
-		State:      StateIdle,
-		Buffs:      make([]*Buff, 0),
-		Equipments: make([]*Equipment, 0),
-		Inventory:  make(map[int32]*InventoryItem),
-		Cooldowns:  make(map[int64]*CooldownEntry),
-		Strength:   10,
-		Agility:    10,
+		ID:           id,
+		Name:         name,
+		AccountID:    accountID,
+		Level:        1,
+		Exp:          0,
+		Pos:          worldmap.Vec3{X: 0, Y: 0, Z: 0},
+		Rotation:     0,
+		Health:       100,
+		MaxHealth:    100,
+		Mana:         50,
+		MaxMana:      50,
+		Stamina:      100,
+		MaxStamina:   100,
+		State:        StateIdle,
+		Buffs:        make([]*Buff, 0),
+		Inventory:    item.NewInventory(id),
+		Strength:     10,
+		Agility:      10,
+		Intelligence: 10,
+		Defense:      5,
 	}
 
 	m.mu.Lock()
@@ -309,7 +263,6 @@ func (p *Player) ApplyBuff(buff *Buff) {
 	for _, b := range p.Buffs {
 		if b.ID == buff.ID {
 			b.Stacks++
-			b.EndTime = time.Now().Unix() + 300
 			found = true
 			break
 		}
@@ -332,173 +285,75 @@ func (p *Player) RemoveBuff(buffID int32) {
 }
 
 func (p *Player) UpdateBuffs() {
-	now := time.Now().Unix()
 	p.mu.Lock()
 	newBuffs := make([]*Buff, 0)
 	for _, buff := range p.Buffs {
-		if buff.EndTime > now {
-			newBuffs = append(newBuffs, buff)
-		}
+		newBuffs = append(newBuffs, buff)
 	}
 	p.Buffs = newBuffs
 	p.mu.Unlock()
 }
 
-func (p *Player) AddItem(itemID int64, count int32) bool {
-	itemConfig, ok := ItemConfigs[itemID]
-	if !ok {
-		return false
-	}
+func (p *Player) AddItem(itemID int64, count int32) error {
+	return p.Inventory.AddItem(itemID, count)
+}
 
+func (p *Player) RemoveItem(slot int32, count int32) error {
+	return p.Inventory.RemoveItem(slot, count)
+}
+
+func (p *Player) UseItem(slot int32) (bool, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	for _, item := range p.Inventory {
-		if item.ItemID == itemID && item.Count < itemConfig.MaxStack {
-			item.Count += count
-			return true
-		}
-	}
-
-	for slot := int32(0); slot < 100; slot++ {
-		if _, ok := p.Inventory[slot]; !ok {
-			p.Inventory[slot] = &InventoryItem{
-				ItemID: itemID,
-				Slot:   slot,
-				Count:  count,
-			}
-			return true
-		}
-	}
-
-	return false
-}
-
-func (p *Player) RemoveItem(slot int32, count int32) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	item, ok := p.Inventory[slot]
-	if !ok || item.Count < count {
-		return false
-	}
-
-	item.Count -= count
-	if item.Count <= 0 {
-		delete(p.Inventory, slot)
-	}
-
-	return true
-}
-
-func (p *Player) GetItem(slot int32) (*InventoryItem, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	item, ok := p.Inventory[slot]
-	return item, ok
-}
-
-func (p *Player) GetInventory() map[int32]*InventoryItem {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	result := make(map[int32]*InventoryItem)
-	for slot, item := range p.Inventory {
-		result[slot] = item
-	}
-	return result
-}
-
-func (p *Player) IsOnCooldown(itemID int64) bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	cooldown, ok := p.Cooldowns[itemID]
-	if !ok {
-		return false
-	}
-
-	return cooldown.EndTime > time.Now().Unix()
-}
-
-func (p *Player) SetCooldown(itemID int64, duration int32) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.Cooldowns[itemID] = &CooldownEntry{
-		ItemID:  itemID,
-		EndTime: time.Now().Unix() + int64(duration),
-	}
-}
-
-func (p *Player) UseItem(slot int32) (bool, string) {
-	item, ok := p.GetItem(slot)
-	if !ok {
-		return false, "道具不存在"
-	}
-
-	itemConfig, ok := ItemConfigs[item.ItemID]
-	if !ok {
-		return false, "道具配置不存在"
-	}
-
-	if itemConfig.Type != ItemTypeConsumable {
-		return false, "该道具不可使用"
-	}
-
-	if p.IsOnCooldown(item.ItemID) {
-		return false, "道具冷却中"
-	}
-
-	p.mu.Lock()
-	if p.State == StateDead {
-		p.mu.Unlock()
-		return false, "死亡状态无法使用道具"
-	}
+	health := p.Health
+	maxHealth := p.MaxHealth
+	mana := p.Mana
+	maxMana := p.MaxMana
+	strength := p.Strength
+	agility := p.Agility
+	intelligence := p.Intelligence
+	defense := p.Defense
 	p.mu.Unlock()
 
-	switch itemConfig.EffectType {
-	case 1:
-		p.Heal(itemConfig.EffectValue)
-	case 2:
-		p.mu.Lock()
-		p.Mana += itemConfig.EffectValue
-		if p.Mana > p.MaxMana {
-			p.Mana = p.MaxMana
-		}
-		p.mu.Unlock()
-	case 3:
-		buff := &Buff{
-			ID:      101,
-			Name:    "力量提升",
-			Stacks:  1,
-			EndTime: time.Now().Unix() + 300,
-		}
-		p.ApplyBuff(buff)
-		p.mu.Lock()
-		p.Strength += itemConfig.EffectValue
-		p.mu.Unlock()
-	case 4:
-		buff := &Buff{
-			ID:      102,
-			Name:    "敏捷提升",
-			Stacks:  1,
-			EndTime: time.Now().Unix() + 300,
-		}
-		p.ApplyBuff(buff)
-		p.mu.Lock()
-		p.Agility += itemConfig.EffectValue
-		p.mu.Unlock()
-	default:
-		return false, "未知的道具效果类型"
+	ctx := &item.EffectContext{
+		PlayerID:     p.ID,
+		Inventory:    p.Inventory,
+		Health:       &health,
+		MaxHealth:    &maxHealth,
+		Mana:         &mana,
+		MaxMana:      &maxMana,
+		Strength:     &strength,
+		Agility:      &agility,
+		Intelligence: &intelligence,
+		Defense:      &defense,
 	}
 
-	if itemConfig.Cooldown > 0 {
-		p.SetCooldown(item.ItemID, itemConfig.Cooldown)
+	success, err := item.UseItem(p.Inventory, slot, ctx)
+	if success {
+		p.mu.Lock()
+		p.Health = health
+		p.Mana = mana
+		p.Strength = strength
+		p.Agility = agility
+		p.Intelligence = intelligence
+		p.Defense = defense
+		p.mu.Unlock()
 	}
 
-	p.RemoveItem(slot, 1)
+	return success, err
+}
 
-	return true, "使用成功"
+func (p *Player) EquipItem(slot int32) error {
+	return p.Inventory.EquipItem(slot)
+}
+
+func (p *Player) UnequipItem(slot item.EquipmentSlot) error {
+	return p.Inventory.UnequipItem(slot)
+}
+
+func (p *Player) AddGold(amount int64) {
+	p.Inventory.AddGold(amount)
+}
+
+func (p *Player) RemoveGold(amount int64) error {
+	return p.Inventory.RemoveGold(amount)
 }

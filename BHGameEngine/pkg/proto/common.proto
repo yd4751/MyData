@@ -137,12 +137,152 @@ message Pong {
     int64 timestamp = 1;
 }
 
+message ItemInfo {
+    int64 item_id = 1;
+    string name = 2;
+    int32 category = 3;
+    int32 sub_type = 4;
+    int32 rarity = 5;
+    int32 level = 6;
+    int32 count = 7;
+    int32 slot = 8;
+    string uid = 9;
+}
+
+message EquipmentInfo {
+    int32 slot = 1;
+    int64 item_id = 2;
+    string item_name = 3;
+    int32 level = 4;
+}
+
+message InventoryInfo {
+    int64 owner_id = 1;
+    int64 gold = 2;
+    int32 capacity = 3;
+    repeated ItemInfo items = 4;
+    repeated EquipmentInfo equipments = 5;
+}
+
+message AddItemRequest {
+    int64 player_id = 1;
+    int64 item_id = 2;
+    int32 count = 3;
+}
+
+message AddItemResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
+message RemoveItemRequest {
+    int64 player_id = 1;
+    int32 slot = 2;
+    int32 count = 3;
+}
+
+message RemoveItemResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
+message UseItemRequest {
+    int64 player_id = 1;
+    int32 slot = 2;
+}
+
+message UseItemResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
+message EquipItemRequest {
+    int64 player_id = 1;
+    int32 slot = 2;
+}
+
+message EquipItemResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
+message UnequipItemRequest {
+    int64 player_id = 1;
+    int32 slot = 2;
+}
+
+message UnequipItemResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
+message GetInventoryRequest {
+    int64 player_id = 1;
+}
+
+message GetInventoryResponse {
+    int32 result = 1;
+    InventoryInfo inventory = 2;
+}
+
+message TradeRequest {
+    int64 player_id = 1;
+    int64 target_id = 2;
+}
+
+message TradeResponse {
+    int32 result = 1;
+    int64 trade_id = 2;
+    string message = 3;
+}
+
+message TradeAddItemRequest {
+    int64 trade_id = 1;
+    int64 player_id = 2;
+    int64 item_id = 3;
+    int32 count = 4;
+}
+
+message TradeSetGoldRequest {
+    int64 trade_id = 1;
+    int64 player_id = 2;
+    int64 gold = 3;
+}
+
+message TradeAcceptRequest {
+    int64 trade_id = 1;
+    int64 player_id = 2;
+}
+
+message TradeCancelRequest {
+    int64 trade_id = 1;
+    int64 player_id = 2;
+}
+
+message CraftRequest {
+    int64 player_id = 1;
+    int64 recipe_id = 2;
+}
+
+message CraftResponse {
+    int32 result = 1;
+    string message = 2;
+}
+
 service GateService {
     rpc Login(LoginRequest) returns (LoginResponse);
     rpc EnterWorld(EnterWorldRequest) returns (EnterWorldResponse);
     rpc Move(MoveRequest) returns (MoveResponse);
     rpc Skill(SkillRequest) returns (SkillResponse);
     rpc Chat(ChatRequest) returns (ChatResponse);
+    rpc AddItem(AddItemRequest) returns (AddItemResponse);
+    rpc RemoveItem(RemoveItemRequest) returns (RemoveItemResponse);
+    rpc UseItem(UseItemRequest) returns (UseItemResponse);
+    rpc EquipItem(EquipItemRequest) returns (EquipItemResponse);
+    rpc UnequipItem(UnequipItemRequest) returns (UnequipItemResponse);
+    rpc GetInventory(GetInventoryRequest) returns (GetInventoryResponse);
+    rpc Trade(TradeRequest) returns (TradeResponse);
+    rpc Craft(CraftRequest) returns (CraftResponse);
 }
 
 service GridMapService {
@@ -162,4 +302,6 @@ service CrossService {
 service DataService {
     rpc SavePlayerData(PlayerInfo) returns (ErrorResponse);
     rpc LoadPlayerData(LoginRequest) returns (PlayerInfo);
+    rpc SaveInventory(InventoryInfo) returns (ErrorResponse);
+    rpc LoadInventory(GetInventoryRequest) returns (InventoryInfo);
 }
