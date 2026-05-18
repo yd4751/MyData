@@ -66,10 +66,19 @@ const (
 )
 
 const (
-	MSG_MAP_LOAD_REQ   uint32 = 5001
-	MSG_MAP_LOAD_RES   uint32 = 5002
-	MSG_MAP_ENTITY_REQ uint32 = 5003
-	MSG_MAP_ENTITY_RES uint32 = 5004
+	MSG_MAP_LOAD_REQ       uint32 = 5001
+	MSG_MAP_LOAD_RES       uint32 = 5002
+	MSG_MAP_ENTITY_REQ     uint32 = 5003
+	MSG_MAP_ENTITY_RES     uint32 = 5004
+	MSG_MAP_PLAYER_ENTER   uint32 = 5005
+	MSG_MAP_PLAYER_LEAVE   uint32 = 5006
+	MSG_MAP_PLAYER_MOVE    uint32 = 5007
+	MSG_MAP_PLAYER_SYNC    uint32 = 5008
+	MSG_MAP_ENTITY_SYNC    uint32 = 5009
+	MSG_MAP_CROSS_GRID_REQ uint32 = 5010
+	MSG_MAP_CROSS_GRID_RES uint32 = 5011
+	MSG_MAP_CHUNK_LOAD_REQ uint32 = 5012
+	MSG_MAP_CHUNK_LOAD_RES uint32 = 5013
 )
 
 const (
@@ -290,6 +299,141 @@ type RewardInfo struct {
 	Value int    `json:"value"`
 }
 
+type MapLoadRequest struct {
+	PlayerID  int64   `json:"player_id"`
+	SessionID string  `json:"session_id"`
+	MapID     int32   `json:"map_id"`
+	TargetX   float64 `json:"target_x"`
+	TargetY   float64 `json:"target_y"`
+}
+
+type MapLoadResponse struct {
+	Result    int           `json:"result"`
+	Message   string        `json:"message"`
+	MapID     int32         `json:"map_id"`
+	PlayerPos *PositionInfo `json:"player_pos"`
+	Chunks    []*ChunkInfo  `json:"chunks"`
+}
+
+type PositionInfo struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Z      float64 `json:"z"`
+	Rot    float64 `json:"rot"`
+	GridID int     `json:"grid_id"`
+}
+
+type ChunkInfo struct {
+	ChunkX   int32         `json:"chunk_x"`
+	ChunkY   int32         `json:"chunk_y"`
+	Tiles    []int32       `json:"tiles"`
+	Entities []*EntityInfo `json:"entities"`
+}
+
+type EntityInfo struct {
+	EntityID   int64   `json:"entity_id"`
+	EntityType int32   `json:"entity_type"`
+	Name       string  `json:"name"`
+	PosX       float64 `json:"pos_x"`
+	PosY       float64 `json:"pos_y"`
+	PosZ       float64 `json:"pos_z"`
+	Rotation   float64 `json:"rotation"`
+	Health     int32   `json:"health"`
+	MaxHealth  int32   `json:"max_health"`
+	State      int32   `json:"state"`
+}
+
+type MapPlayerEnterRequest struct {
+	PlayerID  int64   `json:"player_id"`
+	Name      string  `json:"name"`
+	PosX      float64 `json:"pos_x"`
+	PosY      float64 `json:"pos_y"`
+	PosZ      float64 `json:"pos_z"`
+	Rotation  float64 `json:"rotation"`
+	Level     int32   `json:"level"`
+	Health    int32   `json:"health"`
+	MaxHealth int32   `json:"max_health"`
+}
+
+type MapPlayerEnterResponse struct {
+	Result  int    `json:"result"`
+	Message string `json:"message"`
+}
+
+type MapPlayerLeaveRequest struct {
+	PlayerID int64 `json:"player_id"`
+}
+
+type MapPlayerLeaveResponse struct {
+	Result  int    `json:"result"`
+	Message string `json:"message"`
+}
+
+type MapPlayerMoveRequest struct {
+	PlayerID int64   `json:"player_id"`
+	PosX     float64 `json:"pos_x"`
+	PosY     float64 `json:"pos_y"`
+	PosZ     float64 `json:"pos_z"`
+	Rotation float64 `json:"rotation"`
+}
+
+type MapPlayerMoveResponse struct {
+	Result  int    `json:"result"`
+	Message string `json:"message"`
+}
+
+type MapPlayerSyncRequest struct {
+	PlayerID int64         `json:"player_id"`
+	Players  []*PlayerSync `json:"players"`
+}
+
+type PlayerSync struct {
+	PlayerID  int64   `json:"player_id"`
+	Name      string  `json:"name"`
+	PosX      float64 `json:"pos_x"`
+	PosY      float64 `json:"pos_y"`
+	PosZ      float64 `json:"pos_z"`
+	Rotation  float64 `json:"rotation"`
+	State     int32   `json:"state"`
+	Health    int32   `json:"health"`
+	MaxHealth int32   `json:"max_health"`
+	Level     int32   `json:"level"`
+}
+
+type MapEntitySyncRequest struct {
+	Entities []*EntityInfo `json:"entities"`
+}
+
+type MapCrossGridRequest struct {
+	PlayerID   int64   `json:"player_id"`
+	FromGridID int     `json:"from_grid_id"`
+	ToGridID   int     `json:"to_grid_id"`
+	PosX       float64 `json:"pos_x"`
+	PosY       float64 `json:"pos_y"`
+	PosZ       float64 `json:"pos_z"`
+}
+
+type MapCrossGridResponse struct {
+	Result     int    `json:"result"`
+	Message    string `json:"message"`
+	TargetGrid string `json:"target_grid"`
+}
+
+type MapChunkLoadRequest struct {
+	PlayerID int64 `json:"player_id"`
+	ChunkX   int32 `json:"chunk_x"`
+	ChunkY   int32 `json:"chunk_y"`
+}
+
+type MapChunkLoadResponse struct {
+	Result   int           `json:"result"`
+	Message  string        `json:"message"`
+	ChunkX   int32         `json:"chunk_x"`
+	ChunkY   int32         `json:"chunk_y"`
+	Tiles    []int32       `json:"tiles"`
+	Entities []*EntityInfo `json:"entities"`
+}
+
 type DBResponse struct {
 	Result  int         `json:"result"`
 	Message string      `json:"message"`
@@ -389,6 +533,32 @@ func GetMsgName(msgID uint32) string {
 		return "MSG_PING"
 	case MSG_PONG:
 		return "MSG_PONG"
+	case MSG_MAP_LOAD_REQ:
+		return "MSG_MAP_LOAD_REQ"
+	case MSG_MAP_LOAD_RES:
+		return "MSG_MAP_LOAD_RES"
+	case MSG_MAP_ENTITY_REQ:
+		return "MSG_MAP_ENTITY_REQ"
+	case MSG_MAP_ENTITY_RES:
+		return "MSG_MAP_ENTITY_RES"
+	case MSG_MAP_PLAYER_ENTER:
+		return "MSG_MAP_PLAYER_ENTER"
+	case MSG_MAP_PLAYER_LEAVE:
+		return "MSG_MAP_PLAYER_LEAVE"
+	case MSG_MAP_PLAYER_MOVE:
+		return "MSG_MAP_PLAYER_MOVE"
+	case MSG_MAP_PLAYER_SYNC:
+		return "MSG_MAP_PLAYER_SYNC"
+	case MSG_MAP_ENTITY_SYNC:
+		return "MSG_MAP_ENTITY_SYNC"
+	case MSG_MAP_CROSS_GRID_REQ:
+		return "MSG_MAP_CROSS_GRID_REQ"
+	case MSG_MAP_CROSS_GRID_RES:
+		return "MSG_MAP_CROSS_GRID_RES"
+	case MSG_MAP_CHUNK_LOAD_REQ:
+		return "MSG_MAP_CHUNK_LOAD_REQ"
+	case MSG_MAP_CHUNK_LOAD_RES:
+		return "MSG_MAP_CHUNK_LOAD_RES"
 	case MSG_DB_ACCOUNT_GET:
 		return "MSG_DB_ACCOUNT_GET"
 	case MSG_DB_ACCOUNT_CREATE:

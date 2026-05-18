@@ -4,25 +4,18 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/openworld-server/internal/ai"
 	"github.com/openworld-server/internal/cluster"
 	"github.com/openworld-server/internal/network"
-	"github.com/openworld-server/internal/timer"
-	"github.com/openworld-server/internal/worldmap"
 	"github.com/openworld-server/pkg/config"
 	"github.com/openworld-server/pkg/logger"
 )
 
 var configPath = flag.String("config", "./config/config.toml", "config file path")
-
-type GridMapHandler struct{}
-
-func (h *GridMapHandler) Handle(msg *network.Message) {
-	logger.Info("GridMap server received message from ", msg.Session.RemoteAddr())
-}
+var gridID = flag.Int("grid", 1, "gridmap ID")
 
 func main() {
 	flag.Parse()
@@ -48,15 +41,19 @@ func main() {
 	}()
 
 	listenAddr := config.GetGridMapListenAddr()
-	err = cluster.RegisterService("gridmap", listenAddr, map[string]string{
-		"type": "gridmap",
+	serviceName := "gridmap-" + strconv.FormatInt(int64(*gridID), 10)
+
+	err = cluster.RegisterService(serviceName, listenAddr, map[string]string{
+		"type":    "gridmap",
+		"grid_id": strconv.FormatInt(int64(*gridID), 10),
 	})
 	if err != nil {
 		logger.Fatal("Failed to register service:", err)
 	}
 
-	logger.Info("GridMap server starting network server on ", listenAddr)
-	handler := &GridMapHandler{}
+	logger.Info("GridMap server ", *gridID, " starting network server on ", listenAddr)
+
+	handler := NewGridMapHandler(cluster, *gridID)
 	server := network.NewServer(handler)
 
 	go func() {
@@ -66,20 +63,7 @@ func main() {
 	}()
 	logger.Info("GridMap server network server started")
 
-	worldMap := worldmap.NewWorldMap(256, 3)
-	aiManager := ai.NewAIManager()
-	timerManager := timer.NewTimerManager()
-
-	timerManager.Start()
-	aiManager.Start()
-
-	timerManager.AddTask(1, 0, 1*time.Second, func() {
-		worldMap.UnloadInactiveChunks(30 * time.Second)
-	})
-
-	timerManager.AddTask(2, 0, 5*time.Second, func() {
-		aiManager.Update()
-	})
+	handler.Start()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -87,8 +71,7 @@ func main() {
 
 	logger.Info("Shutting down gridmap server...")
 	server.Stop()
-	timerManager.Stop()
-	aiManager.Stop()
+	handler.Stop()
 }
 
 func startLogServerDiscovery(c *cluster.Cluster) {
