@@ -100,6 +100,10 @@ type SkillManager struct {
 	mu             sync.RWMutex
 }
 
+func (m *SkillManager) TimerManager() *timer.TimerManager {
+	return m.timerManager
+}
+
 var skillManagerInstance *SkillManager
 var once sync.Once
 

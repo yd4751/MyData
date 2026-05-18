@@ -2,6 +2,7 @@ package player
 
 import (
 	"sync"
+	"time"
 
 	"github.com/openworld-server/internal/item"
 	"github.com/openworld-server/internal/worldmap"
@@ -293,6 +294,19 @@ func (p *Player) UpdateBuffs() {
 	newBuffs := make([]*Buff, 0)
 	for _, buff := range p.Buffs {
 		newBuffs = append(newBuffs, buff)
+	}
+	p.Buffs = newBuffs
+	p.mu.Unlock()
+}
+
+func (p *Player) CleanExpiredBuffs() {
+	p.mu.Lock()
+	now := time.Now().UnixNano() / 1e6
+	newBuffs := make([]*Buff, 0)
+	for _, buff := range p.Buffs {
+		if buff.EndTime > now {
+			newBuffs = append(newBuffs, buff)
+		}
 	}
 	p.Buffs = newBuffs
 	p.mu.Unlock()
