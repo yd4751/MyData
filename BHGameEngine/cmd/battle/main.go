@@ -15,12 +15,6 @@ import (
 
 var configPath = flag.String("config", "./config/config.toml", "config file path")
 
-type BattleHandler struct{}
-
-func (h *BattleHandler) Handle(msg *network.Message) {
-	logger.Info("Battle server received message from ", msg.Session.RemoteAddr())
-}
-
 func main() {
 	flag.Parse()
 
@@ -53,7 +47,7 @@ func main() {
 	}
 
 	logger.Info("Battle server starting network server on ", listenAddr)
-	handler := &BattleHandler{}
+	handler := NewBattleHandler()
 	server := network.NewServer(handler)
 
 	go func() {
