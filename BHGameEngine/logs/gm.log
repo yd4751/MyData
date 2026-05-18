@@ -1,0 +1,8 @@
+time="2026-05-17T09:13:30Z" level=info msg="Service registered: gm :8088"
+time="2026-05-17 09:13:30.832" level=info msg="GM server starting network server on :8088"
+time="2026-05-17 09:13:30.832" level=info msg="GM server network server started"
+time="2026-05-17 09:13:30.833" level=info msg="Network server started on :8088"
+time="2026-05-17 09:13:32.825" level=warning msg="Failed to discover webserver for log forwarding, retrying in 5s..."
+time="2026-05-17 09:13:37.827" level=info msg="Log server set to: :7062"
+time="2026-05-17 11:48:44.100" level=info msg="Shutting down GM server..."
+time="2026-05-17 11:48:44.101" level=info msg="Network server stopped"

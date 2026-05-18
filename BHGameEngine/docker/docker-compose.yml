@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: openworld-etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    volumes:
+      - etcd-data:/etcd-data
+
+  mysql:
+    image: mysql:8.0
+    container_name: openworld-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=openworld
+      - MYSQL_USER=game
+      - MYSQL_PASSWORD=gamepass
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:6.2
+    container_name: openworld-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dataservice:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dataservice
+    container_name: openworld-dataservice
+    ports:
+      - "8087:8087"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DB=openworld
+      - REDIS_ADDR=redis:6379
+      - ETCD_ADDR=etcd:2379
+
+  login:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.login
+    container_name: openworld-login
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DB=openworld
+      - REDIS_ADDR=redis:6379
+      - ETCD_ADDR=etcd:2379
+
+  gate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gate
+    container_name: openworld-gate
+    ports:
+      - "7060:7060"
+    depends_on:
+      etcd:
+        condition: service_started
+    environment:
+      - ETCD_ADDR=etcd:2379
+
+  gridmap:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gridmap
+    container_name: openworld-gridmap
+    ports:
+      - "8083:8083"
+    depends_on:
+      etcd:
+        condition: service_started
+    environment:
+      - ETCD_ADDR=etcd:2379
+
+  logic:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.logic
+    container_name: openworld-logic
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DB=openworld
+      - REDIS_ADDR=redis:6379
+      - ETCD_ADDR=etcd:2379
+
+  battle:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.battle
+    container_name: openworld-battle
+    ports:
+      - "8085:8085"
+    depends_on:
+      etcd:
+        condition: service_started
+    environment:
+      - ETCD_ADDR=etcd:2379
+
+  cross:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cross
+    container_name: openworld-cross
+    ports:
+      - "8086:8086"
+    depends_on:
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+    environment:
+      - REDIS_ADDR=redis:6379
+      - ETCD_ADDR=etcd:2379
+
+  gm:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gm
+    container_name: openworld-gm
+    ports:
+      - "8088:8088"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DB=openworld
+      - REDIS_ADDR=redis:6379
+      - ETCD_ADDR=etcd:2379
+
+volumes:
+  etcd-data:
+  mysql-data:
+  redis-data:
