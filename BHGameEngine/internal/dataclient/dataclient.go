@@ -2,42 +2,26 @@ package dataclient
 
 import (
 	"encoding/json"
-	"net"
-	"sync"
 	"time"
 
 	"github.com/openworld-server/internal/cluster"
+	"github.com/openworld-server/internal/connector"
 	"github.com/openworld-server/internal/msg"
-	"github.com/openworld-server/internal/network"
 )
 
 type DataClient struct {
-	cluster *cluster.Cluster
-	mu      sync.Mutex
+	connector *connector.Connector
 }
 
 func NewDataClient(cluster *cluster.Cluster) *DataClient {
 	return &DataClient{
-		cluster: cluster,
+		connector: connector.NewConnector(cluster),
 	}
 }
 
 func (c *DataClient) requestToDataService(msgID uint32, data interface{}) ([]byte, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	service, err := c.cluster.GetRandomService("dataservice")
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := net.Dial("tcp", service.Addr)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
 	var reqData []byte
+	var err error
 	if data != nil {
 		reqData, err = json.Marshal(data)
 		if err != nil {
@@ -45,19 +29,7 @@ func (c *DataClient) requestToDataService(msgID uint32, data interface{}) ([]byt
 		}
 	}
 
-	err = network.SendRawMessage(conn, msgID, msg.NodeTypeData, reqData)
-	if err != nil {
-		return nil, err
-	}
-
-	buf := make([]byte, 4096)
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	n, err := conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	respMsgID, _, respData, err := network.ParseMessage(buf[:n])
+	respMsgID, _, respData, err := c.connector.RequestToNodeType(msg.NodeTypeData, msgID, reqData, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}

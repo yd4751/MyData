@@ -110,6 +110,29 @@ func (n NodeType) String() string {
 	}
 }
 
+func (n NodeType) ServiceName() string {
+	switch n {
+	case NodeTypeGate:
+		return "gate"
+	case NodeTypeLogin:
+		return "login"
+	case NodeTypeLogic:
+		return "logic"
+	case NodeTypeBattle:
+		return "battle"
+	case NodeTypeGridMap:
+		return "gridmap"
+	case NodeTypeCross:
+		return "cross"
+	case NodeTypeData:
+		return "dataservice"
+	case NodeTypeGM:
+		return "gm"
+	default:
+		return ""
+	}
+}
+
 const (
 	MSG_LOGIN_REQ    uint32 = 1001
 	MSG_LOGIN_RES    uint32 = 1002
