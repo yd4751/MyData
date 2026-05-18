@@ -7,6 +7,7 @@ import (
 
 	"github.com/openworld-server/internal/entity"
 	"github.com/openworld-server/internal/player"
+	"github.com/openworld-server/internal/skill"
 	"github.com/openworld-server/internal/worldmap"
 )
 
@@ -28,6 +29,16 @@ type Skill struct {
 	CastTime float64
 	Cooldown float64
 	LastCast int64
+}
+
+type SkillCombatLog struct {
+	Timestamp int64
+	Attacker  int64
+	Target    int64
+	SkillID   int64
+	Damage    int32
+	Heal      int32
+	IsCombo   bool
 }
 
 type CombatLog struct {
@@ -213,4 +224,58 @@ func ProcessMonsterAttack(monster *entity.Monster, player *player.Player) *Comba
 	}
 
 	return log
+}
+
+func ProcessSkillWithNewSystem(attacker *player.Player, targetID int64, skillID int64) *SkillCombatLog {
+	result, err := skill.GetSkillManager().CastSkill(attacker, skillID, targetID)
+	if err != nil {
+		return nil
+	}
+
+	log := &SkillCombatLog{
+		Timestamp: time.Now().Unix(),
+		Attacker:  attacker.ID,
+		Target:    targetID,
+		SkillID:   skillID,
+		IsCombo:   result.IsCombo,
+	}
+
+	for _, effect := range result.Effects {
+		switch effect.EffectType {
+		case skill.EffectTypeDamage, skill.EffectTypeDot:
+			log.Damage += int32(effect.Value)
+		case skill.EffectTypeHeal, skill.EffectTypeHot:
+			log.Heal += int32(effect.Value)
+		}
+	}
+
+	return log
+}
+
+func CalculateSkillDamage(attacker *player.Player, skillConfig *skill.SkillConfig, skillLevel int) int32 {
+	baseDamage := float32(0)
+	for _, effect := range skillConfig.Effects {
+		if effect.EffectType == skill.EffectTypeDamage {
+			baseDamage += effect.Value
+		}
+	}
+
+	baseDamage += float32(attacker.GetLevel()) * 2
+	strengthBonus := float32(attacker.Strength) * 0.5
+	intellectBonus := float32(attacker.Intelligence) * 0.5
+
+	if skillConfig.SkillClass == skill.SkillClassPhysical {
+		baseDamage += strengthBonus
+	} else if skillConfig.SkillClass == skill.SkillClassMagic {
+		baseDamage += intellectBonus
+	}
+
+	levelMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	totalDamage := int32(baseDamage * levelMultiplier)
+
+	if totalDamage < 1 {
+		totalDamage = 1
+	}
+
+	return totalDamage
 }

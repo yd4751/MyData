@@ -179,6 +179,10 @@ func (m *PlayerManager) GetAllPlayers() []*Player {
 	return players
 }
 
+func (p *Player) GetID() int64 {
+	return p.ID
+}
+
 func (p *Player) GetPosition() worldmap.Vec3 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
