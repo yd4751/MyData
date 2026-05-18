@@ -15,8 +15,8 @@ var (
 )
 
 type SkillError struct {
-	Code    int
-	Message string
+	Code    int    // 错误码
+	Message string // 错误信息
 }
 
 func (e *SkillError) Error() string {

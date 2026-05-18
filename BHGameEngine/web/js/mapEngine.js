@@ -27,12 +27,20 @@ class MapEngine {
     }
 
     init(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width || canvas.offsetWidth || window.innerWidth;
+        const height = rect.height || canvas.offsetHeight || window.innerHeight;
+        
+        canvas.width = width;
+        canvas.height = height;
+        
         this.renderer.init(canvas);
         this.viewport.resize(canvas.width, canvas.height);
         
         window.addEventListener('resize', () => {
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
+            const r = canvas.getBoundingClientRect();
+            canvas.width = r.width || canvas.offsetWidth;
+            canvas.height = r.height || canvas.offsetHeight;
             this.viewport.resize(canvas.width, canvas.height);
         });
 
@@ -72,6 +80,7 @@ class MapEngine {
     }
 
     update(deltaTime) {
+        this.viewport.update();
         this.chunkManager.update(this.playerWorldPos);
     }
 
@@ -85,12 +94,18 @@ class MapEngine {
             this.renderer.renderChunk(chunk);
         }
         
-        this.renderer.renderEntities(this.entities);
         this.renderer.renderGrid();
+        this.renderer.renderEntities(this.entities);
+        
+        this.renderer.renderPlayer(this.playerWorldPos);
         
         if (this.debugMode) {
             this.renderer.renderDebug(this.fps, this.chunkManager.loadedChunks.size);
         }
+    }
+
+    forceRender() {
+        this.render();
     }
 
     setPlayerPosition(worldPos) {
@@ -450,6 +465,7 @@ class MapRenderer {
             '#8b7355',
             '#c4a35a'
         ];
+        this.gridSpacing = 64;
     }
 
     init(canvas) {
@@ -517,53 +533,91 @@ class MapRenderer {
     }
 
     renderGrid() {
-        const chunkSize = this.engine.config.chunkSize * this.engine.viewport.getScale();
+        const scale = this.engine.viewport.getScale();
+        const gridSize = this.gridSpacing * scale;
         const visible = this.engine.viewport.getVisibleRect();
-        const startChunk = {
-            x: Math.floor(visible.left / this.engine.config.chunkSize),
-            y: Math.floor(visible.top / this.engine.config.chunkSize)
-        };
-        const endChunk = {
-            x: Math.ceil(visible.right / this.engine.config.chunkSize),
-            y: Math.ceil(visible.bottom / this.engine.config.chunkSize)
-        };
+        
+        const startX = Math.floor(visible.left / this.gridSpacing) * this.gridSpacing;
+        const endX = Math.ceil(visible.right / this.gridSpacing) * this.gridSpacing;
+        const startY = Math.floor(visible.top / this.gridSpacing) * this.gridSpacing;
+        const endY = Math.ceil(visible.bottom / this.gridSpacing) * this.gridSpacing;
 
-        this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.1)';
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.15)';
+        this.ctx.lineWidth = 1;
 
-        for (let x = startChunk.x; x <= endChunk.x; x++) {
-            const screenX = (x * this.engine.config.chunkSize - this.engine.viewport.centerX) * this.engine.viewport.getScale() + this.canvas.width / 2;
+        for (let x = startX; x <= endX; x += this.gridSpacing) {
+            const screenX = (x - this.engine.viewport.centerX) * scale + this.canvas.width / 2;
             this.ctx.beginPath();
             this.ctx.moveTo(screenX, 0);
             this.ctx.lineTo(screenX, this.canvas.height);
             this.ctx.stroke();
         }
 
-        for (let y = startChunk.y; y <= endChunk.y; y++) {
-            const screenY = (y * this.engine.config.chunkSize - this.engine.viewport.centerY) * this.engine.viewport.getScale() + this.canvas.height / 2;
+        for (let y = startY; y <= endY; y += this.gridSpacing) {
+            const screenY = (y - this.engine.viewport.centerY) * scale + this.canvas.height / 2;
             this.ctx.beginPath();
             this.ctx.moveTo(0, screenY);
             this.ctx.lineTo(this.canvas.width, screenY);
             this.ctx.stroke();
         }
+
+        this.renderGridLabels(startX, endX, startY, endY, scale);
+    }
+
+    renderGridLabels(startX, endX, startY, endY, scale) {
+        this.ctx.font = `${10 * scale}px monospace`;
+        this.ctx.fillStyle = 'rgba(0, 212, 255, 0.6)';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+
+        const edgeOffset = 15 * scale;
+        const bottomY = this.canvas.height - edgeOffset;
+
+        for (let x = startX; x <= endX; x += this.gridSpacing) {
+            const screenX = (x - this.engine.viewport.centerX) * scale + this.canvas.width / 2;
+            
+            if (screenX > 30 * scale && screenX < this.canvas.width - 30 * scale) {
+                this.ctx.fillText(`${Math.floor(x)}`, screenX, bottomY);
+            }
+        }
+
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'middle';
+
+        const rightX = this.canvas.width - edgeOffset;
+
+        for (let y = startY; y <= endY; y += this.gridSpacing) {
+            const screenY = (y - this.engine.viewport.centerY) * scale + this.canvas.height / 2;
+            
+            if (screenY > 20 * scale && screenY < this.canvas.height - 20 * scale) {
+                this.ctx.fillText(`${Math.floor(y)}`, rightX, screenY);
+            }
+        }
     }
 
     renderPlayer(worldPos) {
-        const screenPos = this.engine.viewport.worldToScreen(worldPos);
+        if (!this.canvas || !this.ctx) return;
+        
+        const screenPos = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
         
         this.ctx.save();
         
-        this.ctx.shadowColor = '#00d4ff';
-        this.ctx.shadowBlur = 20;
+        this.ctx.shadowColor = '#22c55e';
+        this.ctx.shadowBlur = 25;
         
-        this.ctx.fillStyle = '#00d4ff';
+        this.ctx.fillStyle = '#22c55e';
         this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 16, 0, Math.PI * 2);
+        this.ctx.arc(screenPos.x, screenPos.y, 18, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        this.ctx.fillStyle = '#86efac';
+        this.ctx.beginPath();
+        this.ctx.arc(screenPos.x, screenPos.y, 10, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 8, 0, Math.PI * 2);
+        this.ctx.arc(screenPos.x, screenPos.y, 5, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.restore();

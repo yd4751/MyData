@@ -9,16 +9,17 @@ import (
 )
 
 const (
-	GridMapWidth  = 10000
-	GridMapHeight = 10000
+	GridMapWidth  = 10000 // 地图宽度
+	GridMapHeight = 10000 // 地图高度
 )
 
+// GridMapRouter 网格地图路由
 type GridMapRouter struct {
-	cluster       *cluster.Cluster
-	gridMapCount  int
-	gridMapWidth  float64
-	gridMapHeight float64
-	mu            sync.RWMutex
+	cluster       *cluster.Cluster // 集群管理器
+	gridMapCount  int              // 网格数量
+	gridMapWidth  float64          // 每个网格宽度
+	gridMapHeight float64          // 每个网格高度
+	mu            sync.RWMutex     // 并发锁
 }
 
 func NewGridMapRouter(cluster *cluster.Cluster, gridCount int) *GridMapRouter {

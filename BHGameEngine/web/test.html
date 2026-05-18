@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Map Engine Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0f; overflow: hidden; }
+        #mapCanvas { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="mapCanvas"></canvas>
+
+    <script type="module">
+        import { MapEngine } from './js/mapEngine.js';
+
+        let mapEngine = null;
+        let playerX = 512, playerY = 512;
+        let moveSpeed = 3;
+        let keysPressed = {};
+        let moveInterval = null;
+
+        function init() {
+            const canvas = document.getElementById('mapCanvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            mapEngine = new MapEngine({
+                chunkSize: 256,
+                viewRange: 3,
+                tileSize: 32,
+                renderMode: '2d'
+            });
+
+            mapEngine.init(canvas);
+            mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+            mapEngine.loadInitialChunks();
+            mapEngine.setDebugMode(true);
+
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            window.addEventListener('resize', handleResize);
+        }
+
+        function handleResize() {
+            const canvas = document.getElementById('mapCanvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (mapEngine) {
+                mapEngine.viewport.resize(canvas.width, canvas.height);
+            }
+        }
+
+        function handleKeyDown(event) {
+            const key = event.key.toLowerCase();
+            const directionMap = {
+                'w': 'up', 'arrowup': 'up',
+                's': 'down', 'arrowdown': 'down',
+                'a': 'left', 'arrowleft': 'left',
+                'd': 'right', 'arrowright': 'right'
+            };
+
+            const direction = directionMap[key];
+            if (direction && !keysPressed[key]) {
+                keysPressed[key] = true;
+                startMove();
+            }
+        }
+
+        function handleKeyUp(event) {
+            const key = event.key.toLowerCase();
+            keysPressed[key] = false;
+
+            const stillPressed = Object.keys(keysPressed).some(k => keysPressed[k]);
+            if (!stillPressed) {
+                stopMove();
+            }
+        }
+
+        function startMove() {
+            if (moveInterval) return;
+            moveInterval = setInterval(move, 50);
+        }
+
+        function stopMove() {
+            if (moveInterval) {
+                clearInterval(moveInterval);
+                moveInterval = null;
+            }
+        }
+
+        function move() {
+            let dx = 0, dy = 0;
+            if (keysPressed['w'] || keysPressed['arrowup']) dy = -moveSpeed;
+            if (keysPressed['s'] || keysPressed['arrowdown']) dy = moveSpeed;
+            if (keysPressed['a'] || keysPressed['arrowleft']) dx = -moveSpeed;
+            if (keysPressed['d'] || keysPressed['arrowright']) dx = moveSpeed;
+
+            if (dx !== 0 || dy !== 0) {
+                playerX += dx;
+                playerY += dy;
+                mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+                console.log('Player position:', playerX, playerY);
+            }
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

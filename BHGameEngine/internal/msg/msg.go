@@ -6,8 +6,8 @@ import (
 )
 
 type MessageRouter struct {
-	msgToNodeType map[uint32]NodeType
-	sync.RWMutex
+	msgToNodeType map[uint32]NodeType // 消息ID到节点类型的路由映射
+	sync.RWMutex                      // 读写锁
 }
 
 var router = &MessageRouter{
@@ -41,10 +41,10 @@ func init() {
 	RegisterMessageRoute(MSG_PLAYER_INFO_RES, NodeTypeLogic)
 	RegisterMessageRoute(MSG_PLAYER_MOVE_REQ, NodeTypeLogic)
 	RegisterMessageRoute(MSG_PLAYER_MOVE_RES, NodeTypeLogic)
-	RegisterMessageRoute(MSG_ATTACK_REQ, NodeTypeLogic)
-	RegisterMessageRoute(MSG_ATTACK_RES, NodeTypeLogic)
-	RegisterMessageRoute(MSG_SKILL_REQ, NodeTypeLogic)
-	RegisterMessageRoute(MSG_SKILL_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_ATTACK_REQ, NodeTypeBattle)
+	RegisterMessageRoute(MSG_ATTACK_RES, NodeTypeBattle)
+	RegisterMessageRoute(MSG_SKILL_REQ, NodeTypeBattle)
+	RegisterMessageRoute(MSG_SKILL_RES, NodeTypeBattle)
 	RegisterMessageRoute(MSG_INVENTORY_REQ, NodeTypeLogic)
 	RegisterMessageRoute(MSG_INVENTORY_RES, NodeTypeLogic)
 	RegisterMessageRoute(MSG_ITEM_USE_REQ, NodeTypeLogic)
@@ -208,380 +208,382 @@ const (
 )
 
 type Message struct {
-	ID       uint32
-	NodeType NodeType
-	Data     []byte
+	ID       uint32   // 消息ID
+	NodeType NodeType // 目标节点类型
+	Data     []byte   // 消息数据
 }
 
 type LoginRequest struct {
-	Account  string `json:"account"`
-	Password string `json:"password"`
-	DeviceID string `json:"device_id"`
+	Account  string `json:"account"`   // 账号
+	Password string `json:"password"`  // 密码
+	DeviceID string `json:"device_id"` // 设备ID
 }
 
 type LoginResponse struct {
-	Result     int    `json:"result"`
-	Message    string `json:"message"`
-	SessionID  string `json:"session_id"`
-	PlayerID   int64  `json:"player_id"`
-	PlayerName string `json:"player_name"`
-	Level      int32  `json:"level"`
-	Health     int32  `json:"health"`
+	Result     int    `json:"result"`      // 结果码(0成功)
+	Message    string `json:"message"`     // 提示消息
+	SessionID  string `json:"session_id"`  // 会话ID
+	PlayerID   int64  `json:"player_id"`   // 玩家ID
+	PlayerName string `json:"player_name"` // 玩家名称
+	Level      int32  `json:"level"`       // 玩家等级
+	Health     int32  `json:"health"`      // 当前生命值
 }
 
 type RegisterRequest struct {
-	Account  string `json:"account"`
-	Password string `json:"password"`
+	Account  string `json:"account"`  // 账号
+	Password string `json:"password"` // 密码
 }
 
 type RegisterResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type LogoutRequest struct {
-	SessionID string `json:"session_id"`
+	SessionID string `json:"session_id"` // 会话ID
 }
 
 type LogoutResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type PlayerInfoRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
 }
 
 type PlayerInfoResponse struct {
-	Result     int     `json:"result"`
-	Message    string  `json:"message"`
-	PlayerID   int64   `json:"player_id"`
-	PlayerName string  `json:"player_name"`
-	Level      int32   `json:"level"`
-	Exp        int64   `json:"exp"`
-	Health     int32   `json:"health"`
-	MaxHealth  int32   `json:"max_health"`
-	Mana       int32   `json:"mana"`
-	MaxMana    int32   `json:"max_mana"`
-	PositionX  float64 `json:"pos_x"`
-	PositionY  float64 `json:"pos_y"`
+	Result     int     `json:"result"`      // 结果码(0成功)
+	Message    string  `json:"message"`     // 提示消息
+	PlayerID   int64   `json:"player_id"`   // 玩家ID
+	PlayerName string  `json:"player_name"` // 玩家名称
+	Level      int32   `json:"level"`       // 等级
+	Exp        int64   `json:"exp"`         // 经验值
+	Health     int32   `json:"health"`      // 当前生命值
+	MaxHealth  int32   `json:"max_health"`  // 最大生命值
+	Mana       int32   `json:"mana"`        // 当前魔法值
+	MaxMana    int32   `json:"max_mana"`    // 最大魔法值
+	PositionX  float64 `json:"pos_x"`       // X坐标
+	PositionY  float64 `json:"pos_y"`       // Y坐标
 }
 
 type PlayerMoveRequest struct {
-	PlayerID  int64   `json:"player_id,omitempty"`
-	SessionID string  `json:"session_id,omitempty"`
-	TargetX   float64 `json:"target_x,omitempty"`
-	TargetY   float64 `json:"target_y,omitempty"`
+	PlayerID  int64   `json:"player_id,omitempty"`  // 玩家ID
+	SessionID string  `json:"session_id,omitempty"` // 会话ID
+	TargetX   float64 `json:"target_x,omitempty"`   // 目标X坐标
+	TargetY   float64 `json:"target_y,omitempty"`   // 目标Y坐标
 }
 
 type PlayerMoveResponse struct {
-	Result  int     `json:"result"`
-	Message string  `json:"message"`
-	PosX    float64 `json:"pos_x"`
-	PosY    float64 `json:"pos_y"`
+	Result  int     `json:"result"`  // 结果码(0成功)
+	Message string  `json:"message"` // 提示消息
+	PosX    float64 `json:"pos_x"`   // 当前X坐标
+	PosY    float64 `json:"pos_y"`   // 当前Y坐标
 }
 
 type AttackRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
-	TargetID  int64  `json:"target_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
+	TargetID  int64  `json:"target_id"`  // 目标ID
 }
 
 type AttackResponse struct {
-	Result     int    `json:"result"`
-	Message    string `json:"message"`
-	AttackerID int64  `json:"attacker_id"`
-	TargetID   int64  `json:"target_id"`
-	Damage     int32  `json:"damage"`
-	TargetHP   int32  `json:"target_hp"`
+	Result     int    `json:"result"`      // 结果码(0成功)
+	Message    string `json:"message"`     // 提示消息
+	AttackerID int64  `json:"attacker_id"` // 攻击者ID
+	TargetID   int64  `json:"target_id"`   // 目标ID
+	Damage     int32  `json:"damage"`      // 造成伤害
+	TargetHP   int32  `json:"target_hp"`   // 目标剩余生命值
 }
 
 type SkillRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
-	SkillID   uint32 `json:"skill_id"`
-	TargetID  int64  `json:"target_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
+	SkillID   uint32 `json:"skill_id"`   // 技能ID
+	TargetID  int64  `json:"target_id"`  // 目标ID
 }
 
 type SkillResponse struct {
-	Result   int    `json:"result"`
-	Message  string `json:"message"`
-	SkillID  uint32 `json:"skill_id"`
-	TargetID int64  `json:"target_id"`
-	Damage   int32  `json:"damage"`
-	TargetHP int32  `json:"target_hp"`
+	Result   int    `json:"result"`    // 结果码(0成功)
+	Message  string `json:"message"`   // 提示消息
+	SkillID  uint32 `json:"skill_id"`  // 技能ID
+	TargetID int64  `json:"target_id"` // 目标ID
+	Damage   int32  `json:"damage"`    // 造成伤害
+	TargetHP int32  `json:"target_hp"` // 目标剩余生命值
 }
 
 type InventoryRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
 }
 
 type EquipmentInfo struct {
-	Slot   int32  `json:"slot"`
-	ItemID uint32 `json:"item_id"`
-	Level  int32  `json:"level"`
+	Slot   int32  `json:"slot"`    // 装备槽位
+	ItemID uint32 `json:"item_id"` // 物品ID
+	Level  int32  `json:"level"`   // 强化等级
 }
 
 type InventoryResponse struct {
-	Result      int             `json:"result"`
-	Message     string          `json:"message"`
-	Items       []ItemInfo      `json:"items"`
-	Gold        int64           `json:"gold"`
-	Equipments  []EquipmentInfo `json:"equipments"`
-	Capacity    int32           `json:"capacity"`
-	ItemConfigs []ItemConfig    `json:"item_configs"`
+	Result      int             `json:"result"`       // 结果码(0成功)
+	Message     string          `json:"message"`      // 提示消息
+	Items       []ItemInfo      `json:"items"`        // 背包物品列表
+	Gold        int64           `json:"gold"`         // 金币数量
+	Equipments  []EquipmentInfo `json:"equipments"`   // 装备列表
+	Capacity    int32           `json:"capacity"`     // 背包容量
+	ItemConfigs []ItemConfig    `json:"item_configs"` // 物品配置列表
 }
 
 type ItemInfo struct {
-	ItemID      uint32 `json:"item_id"`
-	Name        string `json:"name"`
-	Icon        string `json:"icon"`
-	Count       int32  `json:"count"`
-	Slot        int32  `json:"slot"`
-	Level       int32  `json:"level"`
-	UID         string `json:"uid"`
-	Description string `json:"description"`
+	ItemID      uint32 `json:"item_id"`     // 物品ID
+	Name        string `json:"name"`        // 物品名称
+	Icon        string `json:"icon"`        // 图标路径
+	Count       int32  `json:"count"`       // 数量
+	Slot        int32  `json:"slot"`        // 槽位
+	Level       int32  `json:"level"`       // 强化等级
+	UID         string `json:"uid"`         // 唯一标识符
+	Description string `json:"description"` // 描述
 }
 
 type ItemUseRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
-	ItemID    uint32 `json:"item_id"`
-	Position  int32  `json:"position"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
+	ItemID    uint32 `json:"item_id"`    // 物品ID
+	Position  int32  `json:"position"`   // 使用位置
 }
 
 type ItemUseResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
+	Slot    int32  `json:"slot"`    // 物品槽位
+	Count   int32  `json:"count"`   // 剩余数量
 }
 
 type TaskListRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
 }
 
 type TaskListResponse struct {
-	Result  int        `json:"result"`
-	Message string     `json:"message"`
-	Tasks   []TaskInfo `json:"tasks"`
+	Result  int        `json:"result"`  // 结果码(0成功)
+	Message string     `json:"message"` // 提示消息
+	Tasks   []TaskInfo `json:"tasks"`   // 任务列表
 }
 
 type TaskInfo struct {
-	TaskID      uint32 `json:"task_id"`
-	Title       string `json:"title"`
-	Status      int    `json:"status"`
-	Progress    int    `json:"progress"`
-	MaxProgress int    `json:"max_progress"`
+	TaskID      uint32 `json:"task_id"`      // 任务ID
+	Title       string `json:"title"`        // 任务标题
+	Status      int    `json:"status"`       // 状态(0-未接取,1-进行中,2-完成)
+	Progress    int    `json:"progress"`     // 当前进度
+	MaxProgress int    `json:"max_progress"` // 最大进度
 }
 
 type TaskAcceptRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
-	TaskID    uint32 `json:"task_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
+	TaskID    uint32 `json:"task_id"`    // 任务ID
 }
 
 type TaskAcceptResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type TaskFinishRequest struct {
-	PlayerID  int64  `json:"player_id"`
-	SessionID string `json:"session_id"`
-	TaskID    uint32 `json:"task_id"`
+	PlayerID  int64  `json:"player_id"`  // 玩家ID
+	SessionID string `json:"session_id"` // 会话ID
+	TaskID    uint32 `json:"task_id"`    // 任务ID
 }
 
 type TaskFinishResponse struct {
-	Result  int          `json:"result"`
-	Message string       `json:"message"`
-	Rewards []RewardInfo `json:"rewards"`
+	Result  int          `json:"result"`  // 结果码(0成功)
+	Message string       `json:"message"` // 提示消息
+	Rewards []RewardInfo `json:"rewards"` // 奖励列表
 }
 
 type RewardInfo struct {
-	Type  string `json:"type"`
-	Value int    `json:"value"`
+	Type  string `json:"type"`  // 奖励类型(gold/exp/item)
+	Value int    `json:"value"` // 奖励值
 }
 
 type MapLoadRequest struct {
-	PlayerID  int64   `json:"player_id"`
-	SessionID string  `json:"session_id"`
-	MapID     int32   `json:"map_id"`
-	TargetX   float64 `json:"target_x"`
-	TargetY   float64 `json:"target_y"`
+	PlayerID  int64   `json:"player_id"`  // 玩家ID
+	SessionID string  `json:"session_id"` // 会话ID
+	MapID     int32   `json:"map_id"`     // 地图ID
+	TargetX   float64 `json:"target_x"`   // 目标X坐标
+	TargetY   float64 `json:"target_y"`   // 目标Y坐标
 }
 
 type MapLoadResponse struct {
-	Result    int           `json:"result"`
-	Message   string        `json:"message"`
-	MapID     int32         `json:"map_id"`
-	PlayerPos *PositionInfo `json:"player_pos"`
-	Chunks    []*ChunkInfo  `json:"chunks"`
+	Result    int           `json:"result"`     // 结果码(0成功)
+	Message   string        `json:"message"`    // 提示消息
+	MapID     int32         `json:"map_id"`     // 地图ID
+	PlayerPos *PositionInfo `json:"player_pos"` // 玩家位置
+	Chunks    []*ChunkInfo  `json:"chunks"`     // 区块列表
 }
 
 type PositionInfo struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Z      float64 `json:"z"`
-	Rot    float64 `json:"rot"`
-	GridID int     `json:"grid_id"`
+	X      float64 `json:"x"`       // X坐标
+	Y      float64 `json:"y"`       // Y坐标
+	Z      float64 `json:"z"`       // Z坐标
+	Rot    float64 `json:"rot"`     // 旋转角度
+	GridID int     `json:"grid_id"` // 网格ID
 }
 
 type ChunkInfo struct {
-	ChunkX   int32         `json:"chunk_x"`
-	ChunkY   int32         `json:"chunk_y"`
-	Tiles    []int32       `json:"tiles"`
-	Entities []*EntityInfo `json:"entities"`
+	ChunkX   int32         `json:"chunk_x"`  // 区块X
+	ChunkY   int32         `json:"chunk_y"`  // 区块Y
+	Tiles    []int32       `json:"tiles"`    // 瓦片数据
+	Entities []*EntityInfo `json:"entities"` // 实体列表
 }
 
 type EntityInfo struct {
-	EntityID   int64   `json:"entity_id"`
-	EntityType int32   `json:"entity_type"`
-	Name       string  `json:"name"`
-	PosX       float64 `json:"pos_x"`
-	PosY       float64 `json:"pos_y"`
-	PosZ       float64 `json:"pos_z"`
-	Rotation   float64 `json:"rotation"`
-	Health     int32   `json:"health"`
-	MaxHealth  int32   `json:"max_health"`
-	State      int32   `json:"state"`
+	EntityID   int64   `json:"entity_id"`   // 实体ID
+	EntityType int32   `json:"entity_type"` // 实体类型
+	Name       string  `json:"name"`        // 名称
+	PosX       float64 `json:"pos_x"`       // X坐标
+	PosY       float64 `json:"pos_y"`       // Y坐标
+	PosZ       float64 `json:"pos_z"`       // Z坐标
+	Rotation   float64 `json:"rotation"`    // 旋转角度
+	Health     int32   `json:"health"`      // 当前生命值
+	MaxHealth  int32   `json:"max_health"`  // 最大生命值
+	State      int32   `json:"state"`       // 状态
 }
 
 type MapPlayerEnterRequest struct {
-	PlayerID  int64   `json:"player_id"`
-	Name      string  `json:"name"`
-	PosX      float64 `json:"pos_x"`
-	PosY      float64 `json:"pos_y"`
-	PosZ      float64 `json:"pos_z"`
-	Rotation  float64 `json:"rotation"`
-	Level     int32   `json:"level"`
-	Health    int32   `json:"health"`
-	MaxHealth int32   `json:"max_health"`
+	PlayerID  int64   `json:"player_id"`  // 玩家ID
+	Name      string  `json:"name"`       // 玩家名称
+	PosX      float64 `json:"pos_x"`      // X坐标
+	PosY      float64 `json:"pos_y"`      // Y坐标
+	PosZ      float64 `json:"pos_z"`      // Z坐标
+	Rotation  float64 `json:"rotation"`   // 旋转角度
+	Level     int32   `json:"level"`      // 等级
+	Health    int32   `json:"health"`     // 当前生命值
+	MaxHealth int32   `json:"max_health"` // 最大生命值
 }
 
 type MapPlayerEnterResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type MapPlayerLeaveRequest struct {
-	PlayerID int64 `json:"player_id"`
+	PlayerID int64 `json:"player_id"` // 玩家ID
 }
 
 type MapPlayerLeaveResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type MapPlayerMoveRequest struct {
-	PlayerID int64   `json:"player_id"`
-	PosX     float64 `json:"pos_x"`
-	PosY     float64 `json:"pos_y"`
-	PosZ     float64 `json:"pos_z"`
-	Rotation float64 `json:"rotation"`
+	PlayerID int64   `json:"player_id"` // 玩家ID
+	PosX     float64 `json:"pos_x"`     // X坐标
+	PosY     float64 `json:"pos_y"`     // Y坐标
+	PosZ     float64 `json:"pos_z"`     // Z坐标
+	Rotation float64 `json:"rotation"`  // 旋转角度
 }
 
 type MapPlayerMoveResponse struct {
-	Result  int    `json:"result"`
-	Message string `json:"message"`
+	Result  int    `json:"result"`  // 结果码(0成功)
+	Message string `json:"message"` // 提示消息
 }
 
 type MapPlayerSyncRequest struct {
-	PlayerID int64         `json:"player_id"`
-	Players  []*PlayerSync `json:"players"`
+	PlayerID int64         `json:"player_id"` // 玩家ID
+	Players  []*PlayerSync `json:"players"`   // 玩家同步列表
 }
 
 type PlayerSync struct {
-	PlayerID  int64   `json:"player_id"`
-	Name      string  `json:"name"`
-	PosX      float64 `json:"pos_x"`
-	PosY      float64 `json:"pos_y"`
-	PosZ      float64 `json:"pos_z"`
-	Rotation  float64 `json:"rotation"`
-	State     int32   `json:"state"`
-	Health    int32   `json:"health"`
-	MaxHealth int32   `json:"max_health"`
-	Level     int32   `json:"level"`
+	PlayerID  int64   `json:"player_id"`  // 玩家ID
+	Name      string  `json:"name"`       // 名称
+	PosX      float64 `json:"pos_x"`      // X坐标
+	PosY      float64 `json:"pos_y"`      // Y坐标
+	PosZ      float64 `json:"pos_z"`      // Z坐标
+	Rotation  float64 `json:"rotation"`   // 旋转角度
+	State     int32   `json:"state"`      // 状态
+	Health    int32   `json:"health"`     // 当前生命值
+	MaxHealth int32   `json:"max_health"` // 最大生命值
+	Level     int32   `json:"level"`      // 等级
 }
 
 type MapEntitySyncRequest struct {
-	Entities []*EntityInfo `json:"entities"`
+	Entities []*EntityInfo `json:"entities"` // 实体同步列表
 }
 
 type MapCrossGridRequest struct {
-	PlayerID   int64   `json:"player_id"`
-	FromGridID int     `json:"from_grid_id"`
-	ToGridID   int     `json:"to_grid_id"`
-	PosX       float64 `json:"pos_x"`
-	PosY       float64 `json:"pos_y"`
-	PosZ       float64 `json:"pos_z"`
+	PlayerID   int64   `json:"player_id"`    // 玩家ID
+	FromGridID int     `json:"from_grid_id"` // 原网格ID
+	ToGridID   int     `json:"to_grid_id"`   // 目标网格ID
+	PosX       float64 `json:"pos_x"`        // X坐标
+	PosY       float64 `json:"pos_y"`        // Y坐标
+	PosZ       float64 `json:"pos_z"`        // Z坐标
 }
 
 type MapCrossGridResponse struct {
-	Result     int    `json:"result"`
-	Message    string `json:"message"`
-	TargetGrid string `json:"target_grid"`
+	Result     int    `json:"result"`      // 结果码(0成功)
+	Message    string `json:"message"`     // 提示消息
+	TargetGrid string `json:"target_grid"` // 目标网格地址
 }
 
 type MapChunkLoadRequest struct {
-	PlayerID int64 `json:"player_id"`
-	ChunkX   int32 `json:"chunk_x"`
-	ChunkY   int32 `json:"chunk_y"`
+	PlayerID int64 `json:"player_id"` // 玩家ID
+	ChunkX   int32 `json:"chunk_x"`   // 区块X
+	ChunkY   int32 `json:"chunk_y"`   // 区块Y
 }
 
 type MapChunkLoadResponse struct {
-	Result   int           `json:"result"`
-	Message  string        `json:"message"`
-	ChunkX   int32         `json:"chunk_x"`
-	ChunkY   int32         `json:"chunk_y"`
-	Tiles    []int32       `json:"tiles"`
-	Entities []*EntityInfo `json:"entities"`
+	Result   int           `json:"result"`   // 结果码(0成功)
+	Message  string        `json:"message"`  // 提示消息
+	ChunkX   int32         `json:"chunk_x"`  // 区块X
+	ChunkY   int32         `json:"chunk_y"`  // 区块Y
+	Tiles    []int32       `json:"tiles"`    // 瓦片数据
+	Entities []*EntityInfo `json:"entities"` // 实体列表
 }
 
 type DBResponse struct {
-	Result  int         `json:"result"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Result  int         `json:"result"`  // 结果码(0成功)
+	Message string      `json:"message"` // 提示消息
+	Data    interface{} `json:"data"`    // 返回数据
 }
 
 type AccountData struct {
-	ID       int64  `json:"id"`
-	Account  string `json:"account"`
-	Password string `json:"password"`
-	Salt     string `json:"salt"`
+	ID       int64  `json:"id"`       // 账号ID
+	Account  string `json:"account"`  // 账号名
+	Password string `json:"password"` // 密码
+	Salt     string `json:"salt"`     // 加密盐
 }
 
 type PlayerData struct {
-	ID        int64   `json:"id"`
-	Name      string  `json:"name"`
-	AccountID int64   `json:"account_id"`
-	Level     int32   `json:"level"`
-	Exp       int64   `json:"exp"`
-	PosX      float64 `json:"pos_x"`
-	PosY      float64 `json:"pos_y"`
-	Health    int32   `json:"health"`
-	MaxHealth int32   `json:"max_health"`
-	Mana      int32   `json:"mana"`
-	MaxMana   int32   `json:"max_mana"`
+	ID        int64   `json:"id"`         // 玩家ID
+	Name      string  `json:"name"`       // 玩家名称
+	AccountID int64   `json:"account_id"` // 账号ID
+	Level     int32   `json:"level"`      // 等级
+	Exp       int64   `json:"exp"`        // 经验值
+	PosX      float64 `json:"pos_x"`      // X坐标
+	PosY      float64 `json:"pos_y"`      // Y坐标
+	Health    int32   `json:"health"`     // 当前生命值
+	MaxHealth int32   `json:"max_health"` // 最大生命值
+	Mana      int32   `json:"mana"`       // 当前魔法值
+	MaxMana   int32   `json:"max_mana"`   // 最大魔法值
 }
 
 type InventoryItem struct {
-	ID       int64 `json:"id"`
-	PlayerID int64 `json:"player_id"`
-	ItemID   int64 `json:"item_id"`
-	Slot     int32 `json:"slot"`
-	Count    int32 `json:"count"`
+	ID       int64 `json:"id"`        // 物品实例ID
+	PlayerID int64 `json:"player_id"` // 玩家ID
+	ItemID   int64 `json:"item_id"`   // 物品配置ID
+	Slot     int32 `json:"slot"`      // 槽位
+	Count    int32 `json:"count"`     // 数量
 }
 
 type ItemConfig struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	Type        int32  `json:"type"`
-	EffectType  int32  `json:"effect_type"`
-	EffectValue int32  `json:"effect_value"`
-	Icon        string `json:"icon"`
-	Description string `json:"description"`
+	ID          int64  `json:"id"`           // 物品配置ID
+	Name        string `json:"name"`         // 物品名称
+	Type        int32  `json:"type"`         // 物品类型
+	EffectType  int32  `json:"effect_type"`  // 效果类型
+	EffectValue int32  `json:"effect_value"` // 效果值
+	Icon        string `json:"icon"`         // 图标路径
+	Description string `json:"description"`  // 描述
 }
 
 func GetMsgName(msgID uint32) string {

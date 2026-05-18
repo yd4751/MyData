@@ -10,19 +10,19 @@ import (
 )
 
 type MapTile struct {
-	TileID     int32
-	Terrain    int32
-	Height     float64
-	Walkable   bool
-	WaterLevel float64
+	TileID     int32   // 瓦片ID
+	Terrain    int32   // 地形类型
+	Height     float64 // 高度
+	Walkable   bool    // 是否可行走
+	WaterLevel float64 // 水位高度
 }
 
 type MapChunkData struct {
-	ChunkPos  ChunkPos
-	Tiles     [ChunkSize][ChunkSize]MapTile
-	Entities  []MapEntityData
-	Timestamp int64
-	Version   int32
+	ChunkPos  ChunkPos                      // 区块位置
+	Tiles     [ChunkSize][ChunkSize]MapTile // 瓦片数据
+	Entities  []MapEntityData               // 实体数据
+	Timestamp int64                         // 时间戳
+	Version   int32                         // 版本号
 }
 
 type MapEntityData struct {
@@ -35,9 +35,9 @@ type MapEntityData struct {
 }
 
 type MapLoader struct {
-	mapDataDir   string
-	loadedChunks map[ChunkPos]*MapChunkData
-	mu           sync.RWMutex
+	mapDataDir   string                     // 地图数据目录
+	loadedChunks map[ChunkPos]*MapChunkData // 已加载的区块
+	mu           sync.RWMutex               // 读写锁
 }
 
 func NewMapLoader(mapDataDir string) *MapLoader {

@@ -10,38 +10,43 @@ import (
 )
 
 const (
-	ChunkSize = 256
-	ViewRange = 3
+	ChunkSize = 256 // 区块大小
+	ViewRange = 3   // 视野范围（区块数量）
 )
 
+// ChunkPos 区块坐标
 type ChunkPos struct {
-	X, Y int
+	X, Y int // 区块坐标
 }
 
+// Chunk 地图区块
 type Chunk struct {
-	Pos      ChunkPos
-	Entities map[int64]interface{}
-	Players  map[int64]*PlayerInChunk
-	Loaded   bool
-	Active   bool
-	mu       sync.RWMutex
+	Pos      ChunkPos                 // 区块坐标
+	Entities map[int64]interface{}    // 区块内实体
+	Players  map[int64]*PlayerInChunk // 区块内玩家
+	Loaded   bool                     // 是否已加载
+	Active   bool                     // 是否活跃
+	mu       sync.RWMutex             // 并发锁
 }
 
+// PlayerInChunk 区块内玩家信息
 type PlayerInChunk struct {
-	PlayerID int64
-	Pos      Vec3
+	PlayerID int64 // 玩家ID
+	Pos      Vec3  // 玩家位置
 }
 
+// Vec3 三维坐标
 type Vec3 struct {
-	X, Y, Z float64
+	X, Y, Z float64 // 三维坐标值
 }
 
+// WorldMap 世界地图
 type WorldMap struct {
-	chunks       map[ChunkPos]*Chunk
-	chunkSize    float64
-	viewRange    int
-	playerChunks map[int64]ChunkPos
-	mu           sync.RWMutex
+	chunks       map[ChunkPos]*Chunk // 区块列表
+	chunkSize    float64             // 区块大小
+	viewRange    int                 // 视野范围
+	playerChunks map[int64]ChunkPos  // 玩家所在区块（玩家ID->区块坐标）
+	mu           sync.RWMutex        // 并发锁
 }
 
 func NewWorldMap(chunkSize float64, viewRange int) *WorldMap {

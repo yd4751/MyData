@@ -9,42 +9,44 @@ import (
 	"github.com/openworld-server/internal/worldmap"
 )
 
-type AIType int32
+type AIType int32 // AI类型
 
 const (
-	AITypePassive    AIType = 1
-	AITypeAggressive AIType = 2
-	AITypePatrol     AIType = 3
-	AITypeBoss       AIType = 4
+	AITypePassive    AIType = 1 // 被动型（不主动攻击）
+	AITypeAggressive AIType = 2 // 主动攻击型
+	AITypePatrol     AIType = 3 // 巡逻型
+	AITypeBoss       AIType = 4 // BOSS型
 )
 
-type AIState int32
+type AIState int32 // AI状态
 
 const (
-	AIStateIdle   AIState = 1
-	AIStatePatrol AIState = 2
-	AIStateChase  AIState = 3
-	AIStateAttack AIState = 4
-	AIStateReturn AIState = 5
+	AIStateIdle   AIState = 1 // 空闲
+	AIStatePatrol AIState = 2 // 巡逻中
+	AIStateChase  AIState = 3 // 追击
+	AIStateAttack AIState = 4 // 攻击中
+	AIStateReturn AIState = 5 // 返回
 )
 
+// AIBehavior AI行为
 type AIBehavior struct {
-	MonsterID  int64
-	Type       AIType
-	State      AIState
-	HomePos    worldmap.Vec3
-	TargetID   int64
-	TargetPos  worldmap.Vec3
-	MoveSpeed  float64
-	LastUpdate int64
-	mu         sync.RWMutex
+	MonsterID  int64         // 怪物ID
+	Type       AIType        // AI类型
+	State      AIState       // 当前状态
+	HomePos    worldmap.Vec3 // 出生点位置
+	TargetID   int64         // 目标ID
+	TargetPos  worldmap.Vec3 // 目标位置
+	MoveSpeed  float64       // 移动速度
+	LastUpdate int64         // 上次更新时间
+	mu         sync.RWMutex  // 并发锁
 }
 
+// AIManager AI管理器
 type AIManager struct {
-	behaviors map[int64]*AIBehavior
-	ticker    *time.Ticker
-	running   bool
-	mu        sync.RWMutex
+	behaviors map[int64]*AIBehavior // AI行为列表
+	ticker    *time.Ticker          // 定时器
+	running   bool                  // 是否运行中
+	mu        sync.RWMutex          // 并发锁
 }
 
 func NewAIManager() *AIManager {

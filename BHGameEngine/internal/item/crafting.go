@@ -5,18 +5,19 @@ import (
 	"sync"
 )
 
+// Recipe 配方
 type Recipe struct {
-	ID            int64
-	Name          string
-	ResultItem    int64
-	ResultCount   int32
-	Materials     map[int64]int32
-	RequiredSkill int32
+	ID            int64           // 配方ID
+	Name          string          // 配方名称
+	ResultItem    int64           // 产出物品ID
+	ResultCount   int32           // 产出数量
+	Materials     map[int64]int32 // 所需材料（物品ID->数量）
+	RequiredSkill int32           // 所需技能等级
 }
 
 var (
-	recipes   = make(map[int64]*Recipe)
-	recipesMu sync.RWMutex
+	recipes   = make(map[int64]*Recipe) // 配方表
+	recipesMu sync.RWMutex              // 配方表锁
 )
 
 func RegisterRecipe(recipe *Recipe) {
