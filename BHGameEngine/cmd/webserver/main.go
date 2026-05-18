@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -43,6 +44,19 @@ var (
 	logBroadcaster = make(chan LogEntry, 100)
 )
 
+func getGateAddrFromEtcd() (string, error) {
+	etcdAddr := config.GetEtcdAddr()
+	c, err := cluster.NewCluster(etcdAddr)
+	if err != nil {
+		return "", err
+	}
+	service, err := c.GetRandomService("gate")
+	if err != nil {
+		return "", err
+	}
+	return service.Addr, nil
+}
+
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -51,47 +65,110 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	gateAddr := config.GlobalConfig.Gate.ListenAddr
-	if gateAddr == "" {
-		gateAddr = ":7060"
+	wsClosed := make(chan struct{})
+	wsErr := make(chan error, 1)
+
+	var tcpConn net.Conn
+	connect := func() error {
+		gateAddr, err := getGateAddrFromEtcd()
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(gateAddr, ":") {
+			gateAddr = "localhost" + gateAddr
+		}
+		tcpConn, err = net.Dial("tcp", gateAddr)
+		if err != nil {
+			return err
+		}
+		log.Println("Connected to gate server:", gateAddr)
+		return nil
 	}
 
-	tcpConn, err := net.Dial("tcp", gateAddr)
+	err = connect()
 	if err != nil {
 		log.Println("Failed to connect to gate server:", err)
-		return
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				err = connect()
+				if err == nil {
+					log.Println("Successfully connected to gate server after retry")
+					goto connected
+				}
+				log.Println("Retry failed, waiting 10s:", err)
+			case <-wsClosed:
+				log.Println("WebSocket closed, aborting connection attempts")
+				return
+			}
+		}
 	}
-	defer tcpConn.Close()
-
-	done := make(chan struct{})
+connected:
 
 	go func() {
-		defer close(done)
+		defer close(wsClosed)
 		for {
 			_, message, err := ws.ReadMessage()
 			if err != nil {
+				wsErr <- err
 				return
 			}
-			tcpConn.Write(message)
-		}
-	}()
-
-	go func() {
-		buf := make([]byte, 4096)
-		reader := bufio.NewReader(tcpConn)
-		for {
-			n, err := reader.Read(buf)
-			if err != nil {
-				if err != io.EOF {
-					log.Println("TCP read error:", err)
+			if tcpConn != nil {
+				_, writeErr := tcpConn.Write(message)
+				if writeErr != nil {
+					log.Println("TCP write error:", writeErr)
 				}
-				return
 			}
-			ws.WriteMessage(websocket.BinaryMessage, buf[:n])
 		}
 	}()
 
-	<-done
+	buf := make([]byte, 4096)
+	for {
+		select {
+		case err := <-wsErr:
+			log.Println("WebSocket error:", err)
+			if tcpConn != nil {
+				tcpConn.Close()
+			}
+			return
+		default:
+		}
+
+		if tcpConn == nil {
+			ticker := time.NewTicker(10 * time.Second)
+			for {
+				select {
+				case <-ticker.C:
+					err := connect()
+					if err == nil {
+						log.Println("Reconnected to gate server")
+						ticker.Stop()
+						goto reconnected
+					}
+					log.Println("Reconnection failed, waiting 10s:", err)
+				case err := <-wsErr:
+					log.Println("WebSocket closed during reconnection:", err)
+					ticker.Stop()
+					return
+				}
+			}
+		reconnected:
+		}
+
+		reader := bufio.NewReader(tcpConn)
+		n, err := reader.Read(buf)
+		if err != nil {
+			if err != io.EOF {
+				log.Println("TCP read error, reconnecting:", err)
+			}
+			tcpConn.Close()
+			tcpConn = nil
+			continue
+		}
+		ws.WriteMessage(websocket.BinaryMessage, buf[:n])
+	}
 }
 
 func logHandler(w http.ResponseWriter, r *http.Request) {

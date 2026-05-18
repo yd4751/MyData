@@ -52,6 +52,14 @@
         .stat-value { font-size: 18px; font-weight: 600; color: #00d4ff; }
         .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
         
+        /* 装备栏 */
+        .equipment-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .equipment-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .equip-slot { aspect-ratio: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .equip-slot:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        .equip-icon { font-size: 18px; }
+        .equip-slot-name { font-size: 8px; color: #888; margin-bottom: 2px; }
+        
         /* 技能面板 */
         .skills-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .skills-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -157,6 +165,10 @@
         .debug-panel { padding: 10px; background: rgba(0,0,0,0.5); font-family: monospace; font-size: 11px; color: #888; }
         .debug-line { margin-bottom: 4px; }
         
+        /* Tooltip按钮 */
+        .tooltip-btn { padding: 6px 12px; background: rgba(0,212,255,0.2); border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .tooltip-btn:hover { background: rgba(0,212,255,0.4); }
+        
         /* 设置面板 */
         .settings-panel { padding: 15px; }
         .settings-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -257,6 +269,13 @@
                     <div class="stat-item"><div class="stat-value">10</div><div class="stat-label">防御</div></div>
                     <div class="stat-item"><div class="stat-value">500</div><div class="stat-label">经验</div></div>
                     <div class="stat-item"><div class="stat-value">1000</div><div class="stat-label">金币</div></div>
+                </div>
+            </div>
+            
+            <!-- 装备栏 -->
+            <div class="equipment-panel">
+                <div class="panel-title">装备</div>
+                <div id="equipmentPanel" class="equipment-grid">
                 </div>
             </div>
             
@@ -431,7 +450,9 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { MapEngine } from './js/mapEngine.js';
+        
         let ws = null;
         let connected = false;
         let isLogin = false;
@@ -442,17 +463,48 @@
         const MAX_STAMINA = 100;
         
         // 游戏状态
-        let playerX = 300, playerY = 200;
+        let playerX = 512, playerY = 512;
         let playerHealth = MAX_HEALTH, playerMana = MAX_MANA, playerStamina = MAX_STAMINA;
         let monsterHealth = 80;
         let isInBattle = false;
         let currentTarget = null;
+        let sessionID = '';
+        let playerID = 0;
+        
+        // 背包状态
+        let inventoryItems = {};      // 物品 {slot: {itemID, count, level, uid}}
+        let equipments = {};          // 装备 {slot: {itemID, level}}
+        let playerGold = 1000;        // 金币
+        let inventoryCapacity = 100;  // 背包容量
+        
+        // 物品配置（从服务端同步的物品信息）
+        let itemConfigs = {};
+        
+        // 物品图标映射
+        const ITEM_ICONS = {
+            1001: '🧪', 1002: '🧪', 1003: '🧪',  // 药水
+            2001: '⚗️', 2002: '⚗️',              // 魔法药水
+            3001: '📜', 3002: '📜',              // 卷轴
+            4001: '⚔️', 4002: '⚔️',              // 武器
+            4003: '🛡️', 4004: '⛑️',              // 护甲
+            5001: '🪨', 5002: '🪵', 5003: '💎',  // 材料
+            6001: '🔑', 6002: '🏅',              // 任务物品
+            7001: '💰', 7002: '⭐'                // 货币
+        };
+        
+        // 装备槽位名称
+        const EQUIP_SLOT_NAMES = {
+            1: '武器', 2: '护甲', 3: '头盔', 4: '靴子', 5: '手套', 6: '戒指', 7: '项链'
+        };
         
         // 移动相关
-        let moveSpeed = 5; // 移动速度
+        let moveSpeed = 3; // 移动速度
         let moveInterval = null;
         let keysPressed = {};
         let currentDirection = null;
+        
+        // 地图引擎
+        let mapEngine = null;
         
         // 节点类型
         const NODE_TYPE = {
@@ -476,17 +528,88 @@
             ATTACK_REQ: 4001, ATTACK_RES: 4002,
             SKILL_REQ: 4003, SKILL_RES: 4004,
             INVENTORY_REQ: 6001, INVENTORY_RES: 6002,
+            ITEM_USE_REQ: 6003, ITEM_USE_RES: 6004,
+            EQUIP_ITEM_REQ: 6005, EQUIP_ITEM_RES: 6006,
+            UNEQUIP_ITEM_REQ: 6007, UNEQUIP_ITEM_RES: 6008,
             TASK_LIST_REQ: 7001, TASK_LIST_RES: 7002,
+            TASK_ACCEPT_REQ: 7003, TASK_ACCEPT_RES: 7004,
+            TASK_FINISH_REQ: 7005, TASK_FINISH_RES: 7006,
+            MAP_LOAD_REQ: 5001, MAP_LOAD_RES: 5002,
+            MAP_ENTITY_REQ: 5003, MAP_ENTITY_RES: 5004,
+            MAP_PLAYER_ENTER: 5005, MAP_PLAYER_LEAVE: 5006,
+            MAP_PLAYER_MOVE: 5007, MAP_PLAYER_SYNC: 5008,
+            MAP_ENTITY_SYNC: 5009,
             PING: 9999, PONG: 9998
         };
+        
+        // 消息路由器
+        class MessageRouter {
+            constructor() {
+                this.msgToNodeType = {};
+            }
+            
+            register(msgId, nodeType) {
+                this.msgToNodeType[msgId] = nodeType;
+            }
+            
+            route(msgId) {
+                return this.msgToNodeType[msgId] || NODE_TYPE.GATE;
+            }
+        }
+        
+        const msgRouter = new MessageRouter();
+        
+        (function initRouter() {
+            msgRouter.register(MSG.LOGIN_REQ, NODE_TYPE.LOGIN);
+            msgRouter.register(MSG.LOGIN_RES, NODE_TYPE.LOGIN);
+            msgRouter.register(MSG.REGISTER_REQ, NODE_TYPE.LOGIN);
+            msgRouter.register(MSG.REGISTER_RES, NODE_TYPE.LOGIN);
+            
+            msgRouter.register(MSG.LOGOUT_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.LOGOUT_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.PLAYER_INFO_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.PLAYER_INFO_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.PLAYER_MOVE_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.PLAYER_MOVE_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.ATTACK_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.ATTACK_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.SKILL_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.SKILL_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.INVENTORY_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.INVENTORY_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.ITEM_USE_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.ITEM_USE_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.EQUIP_ITEM_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.EQUIP_ITEM_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.UNEQUIP_ITEM_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.UNEQUIP_ITEM_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_LIST_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_LIST_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_ACCEPT_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_ACCEPT_RES, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_FINISH_REQ, NODE_TYPE.LOGIC);
+            msgRouter.register(MSG.TASK_FINISH_RES, NODE_TYPE.LOGIC);
+            
+            msgRouter.register(MSG.MAP_LOAD_REQ, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_LOAD_RES, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_ENTITY_REQ, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_ENTITY_RES, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_PLAYER_ENTER, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_PLAYER_LEAVE, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_PLAYER_MOVE, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_PLAYER_SYNC, NODE_TYPE.GRIDMAP);
+            msgRouter.register(MSG.MAP_ENTITY_SYNC, NODE_TYPE.GRIDMAP);
+            
+            msgRouter.register(MSG.PING, NODE_TYPE.GATE);
+            msgRouter.register(MSG.PONG, NODE_TYPE.GATE);
+        })();
         
         // 初始化
         function init() {
             connectWebSocket();
-            drawMap();
             initKeyboardControls();
-            updatePlayerStats(); // 初始化玩家状态显示
-            // 延迟检查连接状态
+            initMapEngine();
+            updatePlayerStats();
             setTimeout(function() {
                 console.log('Init check - connected:', connected, 'ws:', !!ws, 'ws.readyState:', ws ? ws.readyState : 'null');
                 if (ws && ws.readyState === WebSocket.OPEN && !connected) {
@@ -497,6 +620,25 @@
                     document.getElementById('debugConn').textContent = '已连接';
                 }
             }, 1000);
+        }
+        
+        // 初始化地图引擎
+        function initMapEngine() {
+            const canvas = document.getElementById('mapCanvas');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            mapEngine = new MapEngine({
+                chunkSize: 256,
+                viewRange: 3,
+                tileSize: 32,
+                renderMode: '2d'
+            });
+            
+            mapEngine.init(canvas);
+            mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+            mapEngine.loadInitialChunks();
+            mapEngine.setDebugMode(true);
         }
         
         // 初始化键盘控制
@@ -588,22 +730,38 @@
                          direction === 'left' ? {x: -moveSpeed, y: 0} :
                          {x: moveSpeed, y: 0};
             
-            playerX = Math.max(20, Math.min(580, playerX + delta.x));
-            playerY = Math.max(20, Math.min(380, playerY + delta.y));
+            playerX += delta.x;
+            playerY += delta.y;
             
-            document.getElementById('playerMarker').style.left = (playerX / 6) + '%';
-            document.getElementById('playerMarker').style.top = (playerY / 4) + '%';
-            document.getElementById('debugPos').textContent = playerX + ', ' + playerY;
+            updatePlayerMarker();
+            document.getElementById('debugPos').textContent = Math.floor(playerX) + ', ' + Math.floor(playerY);
             updateCoordinateDisplay();
             
-            sendMessage(MSG.PLAYER_MOVE_REQ, {x: playerX, y: playerY, z: 0});
+            if (mapEngine) {
+                mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+            }
+            
+            sendMessage(MSG.PLAYER_MOVE_REQ, {player_id: playerID, session_id: sessionID, target_x: playerX, target_y: playerY});
             
             checkNPCInteraction();
         }
         
+        // 更新玩家标记位置
+        function updatePlayerMarker() {
+            const marker = document.getElementById('playerMarker');
+            if (marker && mapEngine) {
+                const screenPos = mapEngine.worldToScreen({ x: playerX, y: playerY });
+                const mapArea = document.querySelector('.map-area');
+                const rect = mapArea.getBoundingClientRect();
+                
+                marker.style.left = (screenPos.x / rect.width * 100) + '%';
+                marker.style.top = (screenPos.y / rect.height * 100) + '%';
+            }
+        }
+        
         // WebSocket连接
         function connectWebSocket() {
-            const addr = 'ws://localhost:7062/ws';
+            const addr = 'ws://localhost:7070/ws';
             console.log('Connecting to:', addr);
             
             if (ws) {
@@ -685,32 +843,46 @@
         
         // 发送消息到指定节点
         function sendMessageToNode(msgId, nodeType, data) {
-            console.log('sendMessageToNode called - connected:', connected, 'msgId:', msgId, 'nodeType:', nodeType);
-            console.log('ws object:', ws);
-            console.log('ws.readyState:', ws ? ws.readyState : 'null');
-            console.log('WebSocket.OPEN:', WebSocket.OPEN);
+            // 屏蔽心跳消息的打印
+            const isPing = msgId === MSG.PING;
+            if (!isPing) {
+                console.log('sendMessageToNode called - connected:', connected, 'msgId:', msgId, 'nodeType:', nodeType);
+                //console.log('ws object:', ws);
+                //console.log('ws.readyState:', ws ? ws.readyState : 'null');
+                //console.log('WebSocket.OPEN:', WebSocket.OPEN);
+            }
             
             if (!connected || !ws) {
-                console.log('Not connected, cannot send message');
+                if (!isPing) {
+                    console.log('Not connected, cannot send message');
+                }
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
-                    console.log('Attempting to reconnect...');
+                    if (!isPing) {
+                        console.log('Attempting to reconnect...');
+                    }
                     connectWebSocket();
                 }
                 return;
             }
             
             if (ws.readyState !== WebSocket.OPEN) {
-                console.log('WebSocket is not open, readyState:', ws.readyState);
-                console.log('Attempting to reconnect...');
+                if (!isPing) {
+                    console.log('WebSocket is not open, readyState:', ws.readyState);
+                    console.log('Attempting to reconnect...');
+                }
                 connectWebSocket();
                 return;
             }
             
             try {
                 const packet = createPacket(msgId, nodeType, data);
-                console.log('Packet created, length:', packet.byteLength);
+                if (!isPing) {
+                    console.log('Packet created, length:', packet.byteLength);
+                }
                 ws.send(packet);
-                console.log('Message sent successfully - msgId:', msgId, 'nodeType:', nodeType, 'data:', data);
+                if (!isPing) {
+                    console.log('Message sent successfully - msgId:', msgId, 'nodeType:', nodeType, 'data:', data);
+                }
             } catch (e) {
                 console.error('Send message error:', e);
             }
@@ -718,7 +890,8 @@
         
         // 通用发送消息（默认发送到gate）
         function sendMessage(msgId, data) {
-            sendMessageToNode(msgId, NODE_TYPE.GATE, data);
+            const nodeType = msgRouter.route(msgId);
+            sendMessageToNode(msgId, nodeType, data);
         }
         
         // 处理服务器消息
@@ -745,6 +918,10 @@
                     case MSG.PLAYER_INFO_RES: handlePlayerInfoResponse(msg); break;
                     case MSG.PLAYER_MOVE_RES: handleMoveResponse(msg); break;
                     case MSG.ATTACK_RES: handleAttackResponse(msg); break;
+                    case MSG.INVENTORY_RES: handleInventoryResponse(msg); break;
+                    case MSG.ITEM_USE_RES: handleItemUseResponse(msg); break;
+                    case MSG.EQUIP_ITEM_RES: handleEquipResponse(msg); break;
+                    case MSG.UNEQUIP_ITEM_RES: handleUnequipResponse(msg); break;
                     case MSG.PONG: break;
                 }
             } catch (e) {
@@ -821,15 +998,63 @@
                 document.getElementById('playerName').textContent = data.player_name || '测试玩家';
                 document.getElementById('playerLevel').textContent = 'Lv.' + (data.level || 1);
                 
+                // 保存登录信息
+                sessionID = data.session_id || '';
+                playerID = data.player_id || 0;
+                console.log('Login successful - sessionID:', sessionID, 'playerID:', playerID);
+                
                 if (data.health !== undefined) {
                     playerHealth = data.health;
                     updatePlayerStats();
                 }
                 
                 addChatMessage('system', '[系统] 登录成功！欢迎来到游戏世界！');
+                
+                // 初始化测试物品数据（模拟服务端返回）
+                initTestInventory();
+                
+                // 请求背包数据
+                setTimeout(() => {
+                    requestInventory();
+                }, 500);
             } else {
                 alert('登录失败: ' + (data.message || '未知错误'));
             }
+        }
+        
+        // 初始化测试背包数据（模拟服务端数据）
+        function initTestInventory() {
+            // 初始化物品配置
+            itemConfigs = {
+                1001: { id: 1001, name: '小型生命药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复50点生命值', effect_type: 1, effect_value: 50 },
+                1002: { id: 1002, name: '中型生命药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复100点生命值', effect_type: 1, effect_value: 100 },
+                2001: { id: 2001, name: '小型魔法药水', category: 1, sub_type: 101, rarity: 1, level: 1, max_stack: 20, description: '恢复30点魔法值', effect_type: 2, effect_value: 30 },
+                4001: { id: 4001, name: '铁剑', category: 2, sub_type: 201, rarity: 1, level: 1, max_stack: 1, description: '普通的铁剑', attack: 10, equipment_slot: 1 },
+                4003: { id: 4003, name: '皮甲', category: 2, sub_type: 202, rarity: 1, level: 1, max_stack: 1, description: '普通的皮甲', defense: 8, equipment_slot: 2 },
+                5001: { id: 5001, name: '铁矿', category: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '常见的铁矿石' },
+                5002: { id: 5002, name: '木材', category: 3, sub_type: 301, rarity: 1, level: 1, max_stack: 100, description: '普通的木材' },
+                6001: { id: 6001, name: '神秘钥匙', category: 4, sub_type: 401, rarity: 2, level: 1, max_stack: 1, description: '开启神秘之门的钥匙' }
+            };
+            
+            // 初始化背包物品
+            inventoryItems = {
+                0: { itemID: 1001, count: 5, level: 1, uid: 'test_001' },
+                1: { itemID: 1002, count: 2, level: 1, uid: 'test_002' },
+                2: { itemID: 2001, count: 3, level: 1, uid: 'test_003' },
+                3: { itemID: 4001, count: 1, level: 1, uid: 'test_004' },
+                4: { itemID: 4003, count: 1, level: 1, uid: 'test_005' },
+                5: { itemID: 5001, count: 10, level: 1, uid: 'test_006' },
+                6: { itemID: 5002, count: 15, level: 1, uid: 'test_007' },
+                7: { itemID: 6001, count: 1, level: 1, uid: 'test_008' }
+            };
+            
+            // 初始化装备
+            // equipments = { 1: { itemID: 4001, level: 1 } };
+            
+            // 更新显示
+            updateGoldDisplay();
+            renderInventory();
+            renderEquipments();
         }
         
         // 注册响应
@@ -844,7 +1069,7 @@
         
         // 登出处理
         function handleLogout() {
-            sendMessage(MSG.LOGOUT_REQ, {});
+            sendMessage(MSG.LOGOUT_REQ, {session_id: sessionID});
         }
         
         // 登出响应
@@ -859,7 +1084,7 @@
         
         // 获取玩家信息
         function getPlayerInfo() {
-            sendMessage(MSG.PLAYER_INFO_REQ, {});
+            sendMessage(MSG.PLAYER_INFO_REQ, {player_id: playerID, session_id: sessionID});
         }
         
         // 玩家信息响应
@@ -902,43 +1127,6 @@
             document.getElementById('coordDisplay').textContent = 'X: ' + playerX + ', Y: ' + playerY;
         }
         
-        // 移动玩家
-        function movePlayer(direction) {
-            if (!connected) {
-                console.log('Not connected, cannot move');
-                return;
-            }
-            
-            let dx = 0, dy = 0;
-            switch(direction) {
-                case 'up': dy = -1; break;
-                case 'down': dy = 1; break;
-                case 'left': dx = -1; break;
-                case 'right': dx = 1; break;
-            }
-            
-            sendMessage(MSG.PLAYER_MOVE_REQ, {
-                target_x: playerX + dx,
-                target_y: playerY + dy
-            });
-        }
-        
-        // 处理移动响应
-        function handleMoveResponse(data) {
-            if (data.pos_x !== undefined) playerX = data.pos_x;
-            if (data.pos_y !== undefined) playerY = data.pos_y;
-            updateCoordinateDisplay();
-            
-            // 更新玩家标记位置（假设地图范围是0-100）
-            const marker = document.getElementById('playerMarker');
-            if (marker) {
-                const mapX = (playerX / 100) * 100;
-                const mapY = (playerY / 100) * 100;
-                marker.style.left = Math.min(Math.max(mapX, 0), 100) + '%';
-                marker.style.top = Math.min(Math.max(mapY, 0), 100) + '%';
-            }
-        }
-        
         // 切换登录/注册
         function toggleLoginRegister() {
             const loginForm = document.getElementById('loginForm');
@@ -954,60 +1142,6 @@
                 registerForm.classList.remove('hidden');
                 switchText.textContent = '已有账号？点击登录';
             }
-        }
-        
-        // 绘制地图
-        function drawMap() {
-            const canvas = document.getElementById('mapCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            // 绘制地图背景
-            const tileSize = 40;
-            const cols = Math.ceil(canvas.width / tileSize);
-            const rows = Math.ceil(canvas.height / tileSize);
-            
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    const noise = Math.random();
-                    let color = '#1a1a2e'; // 平原
-                    
-                    if (noise > 0.9) color = '#3b82f6'; // 水域
-                    else if (noise > 0.7) color = '#22c55e'; // 森林
-                    else if (noise > 0.85) color = '#f59e0b'; // 沙漠
-                    else if (noise > 0.8) color = '#ef4444'; // 危险区域
-                    
-                    ctx.fillStyle = color;
-                    ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-                    
-                    // 绘制网格线
-                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-                    ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
-                }
-            }
-            
-            // 绘制玩家标记
-            ctx.fillStyle = '#00d4ff';
-            ctx.beginPath();
-            ctx.arc(canvas.width / 2, canvas.height / 2, 15, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // 绘制NPC标记
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            ctx.arc(canvas.width * 0.3, canvas.height * 0.3, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // 绘制怪物标记
-            ctx.fillStyle = '#ef4444';
-            ctx.beginPath();
-            ctx.arc(canvas.width * 0.7, canvas.height * 0.6, 10, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(canvas.width * 0.4, canvas.height * 0.7, 10, 0, Math.PI * 2);
-            ctx.fill();
         }
         
         // 移动玩家（按钮点击）
@@ -1124,7 +1258,7 @@
             }
             
             updatePlayerStats();
-            sendMessage(MSG.SKILL_REQ, {skill_id: skillId, target_id: currentTarget || 0});
+            sendMessage(MSG.SKILL_REQ, {player_id: playerID, session_id: sessionID, skill_id: skillId, target_id: currentTarget || 0});
         }
         
         // 开始战斗
@@ -1230,12 +1364,17 @@
         
         // 移动响应
         function handleMoveResponse(data) {
-            if (data.x !== undefined) {
-                playerX = data.x;
-                playerY = data.y || playerY;
-                document.getElementById('playerMarker').style.left = (playerX / 6) + '%';
-                document.getElementById('playerMarker').style.top = (playerY / 4) + '%';
-                document.getElementById('debugPos').textContent = playerX + ', ' + playerY;
+            if (data.x !== undefined || data.pos_x !== undefined) {
+                playerX = data.x !== undefined ? data.x : data.pos_x;
+                playerY = data.y !== undefined ? data.y : (data.pos_y !== undefined ? data.pos_y : playerY);
+                
+                updatePlayerMarker();
+                document.getElementById('debugPos').textContent = Math.floor(playerX) + ', ' + Math.floor(playerY);
+                updateCoordinateDisplay();
+                
+                if (mapEngine) {
+                    mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+                }
             }
         }
         
@@ -1252,6 +1391,403 @@
             }
         }
         
+        // 请求背包数据
+        function requestInventory() {
+            sendMessage(MSG.INVENTORY_REQ, {player_id: playerID, session_id: sessionID});
+        }
+        
+        // 背包响应处理
+        function handleInventoryResponse(data) {
+            if (data.result === 0) {
+                // 更新金币
+                if (data.gold !== undefined) {
+                    playerGold = data.gold;
+                    updateGoldDisplay();
+                }
+                
+                // 更新物品
+                if (data.items) {
+                    inventoryItems = {};
+                    data.items.forEach(item => {
+                        inventoryItems[item.slot] = {
+                            itemID: item.item_id,
+                            count: item.count,
+                            level: item.level || 0,
+                            uid: item.uid
+                        };
+                    });
+                    renderInventory();
+                }
+                
+                // 更新装备
+                if (data.equipments) {
+                    equipments = {};
+                    data.equipments.forEach(equip => {
+                        equipments[equip.slot] = {
+                            itemID: equip.item_id,
+                            level: equip.level || 0
+                        };
+                    });
+                    renderEquipments();
+                }
+                
+                // 更新容量
+                if (data.capacity !== undefined) {
+                    inventoryCapacity = data.capacity;
+                }
+                
+                // 同步物品配置
+                if (data.item_configs) {
+                    data.item_configs.forEach(config => {
+                        itemConfigs[config.id] = config;
+                    });
+                }
+            } else {
+                console.error('获取背包失败:', data.message);
+            }
+        }
+        
+        // 使用物品
+        function useItem(slot) {
+            const item = inventoryItems[slot];
+            if (!item) return;
+            
+            const config = itemConfigs[item.itemID];
+            if (!config) {
+                console.error('物品配置不存在:', item.itemID);
+                return;
+            }
+            
+            // 消耗品才能使用
+            if (config.category !== 1) {
+                addChatMessage('system', '[系统] 该物品不能使用');
+                return;
+            }
+            
+            sendMessage(MSG.ITEM_USE_REQ, {
+                player_id: playerID,
+                session_id: sessionID,
+                slot: slot
+            });
+        }
+        
+        // 使用物品响应
+        function handleItemUseResponse(data) {
+            if (data.result === 0) {
+                // 更新物品数量或移除
+                if (data.slot !== undefined) {
+                    if (data.count > 0) {
+                        inventoryItems[data.slot].count = data.count;
+                    } else {
+                        delete inventoryItems[data.slot];
+                    }
+                    renderInventory();
+                }
+                
+                // 应用效果
+                if (data.effect) {
+                    applyItemEffect(data.effect);
+                }
+                
+                addChatMessage('system', '[系统] 使用物品成功');
+            } else {
+                addChatMessage('system', '[系统] 使用物品失败: ' + (data.message || '未知错误'));
+            }
+        }
+        
+        // 应用物品效果
+        function applyItemEffect(effect) {
+            switch(effect.type) {
+                case 1: // 恢复HP
+                    playerHealth = Math.min(MAX_HEALTH, playerHealth + effect.value);
+                    addChatMessage('system', `[系统] 恢复了 ${effect.value} 点生命值`);
+                    break;
+                case 2: // 恢复MP
+                    playerMana = Math.min(MAX_MANA, playerMana + effect.value);
+                    addChatMessage('system', `[系统] 恢复了 ${effect.value} 点魔法值`);
+                    break;
+                case 3: // 力量加成
+                    addChatMessage('system', `[系统] 力量+${effect.value}`);
+                    break;
+                case 4: // 敏捷加成
+                    addChatMessage('system', `[系统] 敏捷+${effect.value}`);
+                    break;
+                case 5: // 智力加成
+                    addChatMessage('system', `[系统] 智力+${effect.value}`);
+                    break;
+            }
+            updatePlayerStats();
+        }
+        
+        // 装备物品
+        function equipItem(slot) {
+            const item = inventoryItems[slot];
+            if (!item) return;
+            
+            const config = itemConfigs[item.itemID];
+            if (!config) {
+                console.error('物品配置不存在:', item.itemID);
+                return;
+            }
+            
+            // 只有装备才能装备
+            if (config.category !== 2) {
+                addChatMessage('system', '[系统] 该物品不是装备');
+                return;
+            }
+            
+            sendMessage(MSG.EQUIP_ITEM_REQ, {
+                player_id: playerID,
+                session_id: sessionID,
+                slot: slot
+            });
+        }
+        
+        // 装备物品响应
+        function handleEquipResponse(data) {
+            if (data.result === 0) {
+                // 从背包移除装备
+                if (data.old_slot !== undefined) {
+                    delete inventoryItems[data.old_slot];
+                }
+                
+                // 如果有替换下来的装备，添加到背包
+                if (data.new_item) {
+                    inventoryItems[data.new_slot] = {
+                        itemID: data.new_item.item_id,
+                        count: data.new_item.count,
+                        level: data.new_item.level || 0,
+                        uid: data.new_item.uid
+                    };
+                }
+                
+                // 更新装备
+                if (data.equipment) {
+                    equipments[data.equipment.slot] = {
+                        itemID: data.equipment.item_id,
+                        level: data.equipment.level || 0
+                    };
+                }
+                
+                renderInventory();
+                renderEquipments();
+                addChatMessage('system', '[系统] 装备成功');
+            } else {
+                addChatMessage('system', '[系统] 装备失败: ' + (data.message || '未知错误'));
+            }
+        }
+        
+        // 卸下装备
+        function unequipItem(slot) {
+            if (!equipments[slot]) return;
+            
+            sendMessage(MSG.UNEQUIP_ITEM_REQ, {
+                player_id: playerID,
+                session_id: sessionID,
+                slot: slot
+            });
+        }
+        
+        // 卸下装备响应
+        function handleUnequipResponse(data) {
+            if (data.result === 0) {
+                // 移除装备
+                delete equipments[data.slot];
+                
+                // 添加到背包
+                if (data.item) {
+                    inventoryItems[data.item.slot] = {
+                        itemID: data.item.item_id,
+                        count: data.item.count,
+                        level: data.item.level || 0,
+                        uid: data.item.uid
+                    };
+                }
+                
+                renderInventory();
+                renderEquipments();
+                addChatMessage('system', '[系统] 卸下装备成功');
+            } else {
+                addChatMessage('system', '[系统] 卸下装备失败: ' + (data.message || '未知错误'));
+            }
+        }
+        
+        // 更新金币显示
+        function updateGoldDisplay() {
+            const goldDisplay = document.querySelector('.gold-value');
+            if (goldDisplay) {
+                goldDisplay.textContent = '💰 ' + playerGold.toLocaleString();
+            }
+        }
+        
+        // 渲染背包
+        function renderInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            if (!grid) return;
+            
+            // 清空现有内容
+            grid.innerHTML = '';
+            
+            // 创建背包格子（显示前16个格子）
+            for (let i = 0; i < 16; i++) {
+                const item = inventoryItems[i];
+                const cell = document.createElement('div');
+                cell.className = 'inventory-item';
+                
+                if (item) {
+                    const config = itemConfigs[item.itemID];
+                    const icon = ITEM_ICONS[item.itemID] || '📦';
+                    
+                    cell.innerHTML = `
+                        <div class="item-icon">${icon}</div>
+                        ${item.count > 1 ? `<div class="item-count">${item.count}</div>` : ''}
+                    `;
+                    
+                    // 设置稀有度边框颜色
+                    const rarityColors = {1: '#9ca3af', 2: '#22c55e', 3: '#3b82f6', 4: '#a855f7', 5: '#f59e0b'};
+                    if (config && rarityColors[config.rarity]) {
+                        cell.style.borderColor = rarityColors[config.rarity];
+                    }
+                    
+                    // 添加点击事件
+                    cell.onclick = function() {
+                        showItemTooltip(item, config, i);
+                    };
+                } else {
+                    cell.innerHTML = '<div class="item-icon" style="opacity: 0.3;">📦</div>';
+                }
+                
+                grid.appendChild(cell);
+            }
+        }
+        
+        // 渲染装备栏
+        function renderEquipments() {
+            // 装备栏应该在左侧面板显示
+            const equipPanel = document.getElementById('equipmentPanel');
+            if (!equipPanel) return;
+            
+            equipPanel.innerHTML = '';
+            
+            for (let i = 1; i <= 7; i++) {
+                const equip = equipments[i];
+                const slotName = EQUIP_SLOT_NAMES[i];
+                
+                const div = document.createElement('div');
+                div.className = 'equip-slot';
+                
+                if (equip) {
+                    const config = itemConfigs[equip.itemID];
+                    const icon = ITEM_ICONS[equip.itemID] || '📦';
+                    
+                    div.innerHTML = `
+                        <span class="equip-slot-name">${slotName}</span>
+                        <span class="equip-icon">${icon}</span>
+                    `;
+                    
+                    div.onclick = function() {
+                        showEquipTooltip(equip, config, i);
+                    };
+                } else {
+                    div.innerHTML = `
+                        <span class="equip-slot-name">${slotName}</span>
+                        <span class="equip-icon" style="opacity: 0.3;">📦</span>
+                    `;
+                }
+                
+                equipPanel.appendChild(div);
+            }
+        }
+        
+        // 显示物品提示
+        function showItemTooltip(item, config, slot) {
+            if (!config) return;
+            
+            const tooltip = document.createElement('div');
+            tooltip.className = 'item-tooltip';
+            
+            const rarityColors = {
+                1: '#9ca3af', 2: '#22c55e', 3: '#3b82f6', 4: '#a855f7', 5: '#f59e0b'
+            };
+            const color = rarityColors[config.rarity] || '#fff';
+            
+            tooltip.innerHTML = `
+                <div style="color: ${color}; font-weight: bold;">${config.name}</div>
+                <div style="font-size: 12px; color: #888;">Lv.${config.level || 1}</div>
+                <div style="margin-top: 5px; font-size: 11px; color: #aaa;">${config.description}</div>
+                ${config.attack ? `<div style="font-size: 11px; color: #ef4444;">攻击 +${config.attack}</div>` : ''}
+                ${config.defense ? `<div style="font-size: 11px; color: #3b82f6;">防御 +${config.defense}</div>` : ''}
+                ${config.strength ? `<div style="font-size: 11px; color: #f59e0b;">力量 +${config.strength}</div>` : ''}
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    ${config.category === 1 ? `<button class="tooltip-btn" onclick="useItem(${slot}); closeTooltip();">使用</button>` : ''}
+                    ${config.category === 2 ? `<button class="tooltip-btn" onclick="equipItem(${slot}); closeTooltip();">装备</button>` : ''}
+                    <button class="tooltip-btn" onclick="closeTooltip()">关闭</button>
+                </div>
+            `;
+            
+            tooltip.style.position = 'fixed';
+            tooltip.style.left = '50%';
+            tooltip.style.top = '50%';
+            tooltip.style.transform = 'translate(-50%, -50%)';
+            tooltip.style.background = 'rgba(0,0,0,0.95)';
+            tooltip.style.padding = '15px';
+            tooltip.style.borderRadius = '10px';
+            tooltip.style.border = '1px solid rgba(255,255,255,0.2)';
+            tooltip.style.zIndex = '1000';
+            tooltip.style.minWidth = '200px';
+            
+            document.body.appendChild(tooltip);
+        }
+        
+        // 显示装备提示
+        function showEquipTooltip(equip, config, slot) {
+            if (!config) return;
+            
+            const tooltip = document.createElement('div');
+            tooltip.className = 'item-tooltip';
+            
+            const rarityColors = {
+                1: '#9ca3af', 2: '#22c55e', 3: '#3b82f6', 4: '#a855f7', 5: '#f59e0b'
+            };
+            const color = rarityColors[config.rarity] || '#fff';
+            
+            tooltip.innerHTML = `
+                <div style="color: ${color}; font-weight: bold;">${config.name}</div>
+                <div style="font-size: 12px; color: #888;">Lv.${config.level || 1}</div>
+                <div style="margin-top: 5px; font-size: 11px; color: #aaa;">${config.description}</div>
+                ${config.attack ? `<div style="font-size: 11px; color: #ef4444;">攻击 +${config.attack}</div>` : ''}
+                ${config.defense ? `<div style="font-size: 11px; color: #3b82f6;">防御 +${config.defense}</div>` : ''}
+                ${config.strength ? `<div style="font-size: 11px; color: #f59e0b;">力量 +${config.strength}</div>` : ''}
+                ${config.agility ? `<div style="font-size: 11px; color: #22c55e;">敏捷 +${config.agility}</div>` : ''}
+                ${config.intelligence ? `<div style="font-size: 11px; color: #a855f7;">智力 +${config.intelligence}</div>` : ''}
+                <div style="margin-top: 10px;">
+                    <button class="tooltip-btn" onclick="unequipItem(${slot}); closeTooltip();">卸下</button>
+                    <button class="tooltip-btn" onclick="closeTooltip()">关闭</button>
+                </div>
+            `;
+            
+            tooltip.style.position = 'fixed';
+            tooltip.style.left = '50%';
+            tooltip.style.top = '50%';
+            tooltip.style.transform = 'translate(-50%, -50%)';
+            tooltip.style.background = 'rgba(0,0,0,0.95)';
+            tooltip.style.padding = '15px';
+            tooltip.style.borderRadius = '10px';
+            tooltip.style.border = '1px solid rgba(255,255,255,0.2)';
+            tooltip.style.zIndex = '1000';
+            tooltip.style.minWidth = '200px';
+            
+            document.body.appendChild(tooltip);
+        }
+        
+        // 关闭提示
+        function closeTooltip() {
+            const tooltip = document.querySelector('.item-tooltip');
+            if (tooltip) {
+                tooltip.remove();
+            }
+        }
+        
         // 清除缓存
         function clearCache() {
             localStorage.clear();
@@ -1260,6 +1796,22 @@
         
         // 页面加载完成后初始化
         window.onload = init;
+        
+        // 暴露函数到全局作用域供HTML调用
+        window.handleLogin = handleLogin;
+        window.handleRegister = handleRegister;
+        window.toggleLoginRegister = toggleLoginRegister;
+        window.handleLogout = handleLogout;
+        window.movePlayer = movePlayer;
+        window.useSkill = useSkill;
+        window.startBattle = startBattle;
+        window.openAttackMode = openAttackMode;
+        window.sendChat = sendChat;
+        window.clearCache = clearCache;
+        window.useItem = useItem;
+        window.equipItem = equipItem;
+        window.unequipItem = unequipItem;
+        window.closeTooltip = closeTooltip;
     </script>
 </body>
 </html>

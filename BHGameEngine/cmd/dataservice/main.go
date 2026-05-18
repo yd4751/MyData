@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/openworld-server/internal/cluster"
 	"github.com/openworld-server/internal/db"
 	"github.com/openworld-server/internal/log"
 	"github.com/openworld-server/internal/msg"
@@ -399,6 +400,14 @@ func main() {
 	loggerConfig := config.GetLoggerConfig()
 	logger.Init(loggerConfig.Path, loggerConfig.Level)
 
+	etcdAddr := config.GetEtcdAddr()
+	log.Info("Connecting to etcd at ", etcdAddr)
+	cluster, err := cluster.NewCluster(etcdAddr)
+	if err != nil {
+		log.Fatal("Failed to connect to etcd:", err)
+	}
+	log.Info("Connected to etcd successfully")
+
 	mysqlConfig := config.GetMySQLConfig()
 	log.Info("Connecting to MySQL at ", mysqlConfig.Host, ":", mysqlConfig.Port)
 	database, err := db.NewDatabase(db.DBConfig{
@@ -420,6 +429,13 @@ func main() {
 	}
 
 	listenAddr := config.GetDataServiceListenAddr()
+	log.Info("Registering dataservice at ", listenAddr)
+	err = cluster.RegisterService("dataservice", listenAddr, map[string]string{
+		"type": "dataservice",
+	})
+	if err != nil {
+		log.Fatal("Failed to register service:", err)
+	}
 	log.Info("Data service starting on ", listenAddr)
 
 	handler := &DataServiceHandler{database: database}

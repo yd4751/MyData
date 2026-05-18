@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 
-	"github.com/openworld-server/internal/db"
+	"github.com/openworld-server/internal/dataclient"
 	"github.com/openworld-server/internal/log"
 	"github.com/openworld-server/internal/msg"
 	"github.com/openworld-server/internal/network"
@@ -12,13 +13,13 @@ import (
 )
 
 type LogicHandler struct {
-	database    *db.Database
+	dataClient  *dataclient.DataClient
 	redisClient *redis.RedisClient
 }
 
-func NewLogicHandler(database *db.Database, redisClient *redis.RedisClient) *LogicHandler {
+func NewLogicHandler(dataClient *dataclient.DataClient, redisClient *redis.RedisClient) *LogicHandler {
 	return &LogicHandler{
-		database:    database,
+		dataClient:  dataClient,
 		redisClient: redisClient,
 	}
 }
@@ -51,7 +52,7 @@ func (h *LogicHandler) handlePlayerInfo(msgObj *network.Message) {
 
 	log.Info("Player info request: PlayerID=", req.PlayerID)
 
-	player, err := h.database.GetPlayerByID(req.PlayerID)
+	player, err := h.dataClient.GetPlayerByID(req.PlayerID)
 	if err != nil {
 		log.Error("Failed to get player:", err)
 		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Player not found")
@@ -83,6 +84,8 @@ func (h *LogicHandler) handlePlayerInfo(msgObj *network.Message) {
 }
 
 func (h *LogicHandler) handlePlayerMove(msgObj *network.Message) {
+	log.Debug("Raw player move request data: ", string(msgObj.Data))
+
 	var req msg.PlayerMoveRequest
 	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
@@ -93,7 +96,11 @@ func (h *LogicHandler) handlePlayerMove(msgObj *network.Message) {
 
 	log.Info("Player move request: PlayerID=", req.PlayerID, ", TargetX=", req.TargetX, ", TargetY=", req.TargetY)
 
-	err = h.database.UpdatePlayerPosition(req.PlayerID, req.TargetX, req.TargetY)
+	if req.PlayerID == 0 {
+		log.Warn("PlayerID is 0, possibly JSON field name mismatch")
+	}
+
+	err = h.dataClient.UpdatePlayerPosition(req.PlayerID, req.TargetX, req.TargetY)
 	if err != nil {
 		log.Error("Failed to update player position:", err)
 		h.sendMoveError(msgObj.Session, "Internal error")
@@ -163,9 +170,12 @@ func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
 		return
 	}
 
-	log.Info("Inventory request: PlayerID=", req.PlayerID)
+	log.Info("Inventory request received: PlayerID=", req.PlayerID, ", SessionID=", req.SessionID)
+	if req.PlayerID == 0 {
+		log.Warn("Inventory request with PlayerID=0, this will return empty inventory")
+	}
 
-	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	inventory, err := h.dataClient.GetPlayerInventory(req.PlayerID)
 	if err != nil {
 		log.Error("Failed to get player inventory:", err)
 		h.sendInventoryError(msgObj.Session, "Internal error")
@@ -173,8 +183,11 @@ func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
 	}
 
 	items := make([]msg.ItemInfo, 0)
+	itemConfigs := make([]msg.ItemConfig, 0)
+	configMap := make(map[int64]bool)
+
 	for _, item := range inventory {
-		itemConfig, err := h.database.GetItemConfig(item.ItemID)
+		itemConfig, err := h.dataClient.GetItemConfig(item.ItemID)
 		if err != nil {
 			log.Warn("Item config not found for item ID:", item.ItemID)
 			items = append(items, msg.ItemInfo{
@@ -182,10 +195,25 @@ func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
 				Name:        "未知道具",
 				Icon:        "unknown",
 				Count:       item.Count,
-				Position:    item.Slot,
+				Slot:        item.Slot,
+				Level:       0,
+				UID:         fmt.Sprintf("%d", item.ID),
 				Description: "未知道具",
 			})
 			continue
+		}
+
+		if !configMap[item.ItemID] {
+			itemConfigs = append(itemConfigs, msg.ItemConfig{
+				ID:          itemConfig.ID,
+				Name:        itemConfig.Name,
+				Type:        itemConfig.Type,
+				EffectType:  itemConfig.EffectType,
+				EffectValue: itemConfig.EffectValue,
+				Icon:        itemConfig.Icon,
+				Description: itemConfig.Description,
+			})
+			configMap[item.ItemID] = true
 		}
 
 		items = append(items, msg.ItemInfo{
@@ -193,14 +221,20 @@ func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
 			Name:        itemConfig.Name,
 			Icon:        itemConfig.Icon,
 			Count:       item.Count,
-			Position:    item.Slot,
+			Slot:        item.Slot,
+			Level:       0,
+			UID:         fmt.Sprintf("%d", item.ID),
 			Description: itemConfig.Description,
 		})
 	}
 
 	resp := msg.InventoryResponse{
-		Result: 0,
-		Items:  items,
+		Result:      0,
+		Items:       items,
+		Gold:        1000,
+		Equipments:  []msg.EquipmentInfo{},
+		Capacity:    50,
+		ItemConfigs: itemConfigs,
 	}
 
 	log.Info("Inventory response sent: PlayerID=", req.PlayerID, ", ItemCount=", len(items))
@@ -218,21 +252,21 @@ func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
 
 	log.Info("Item use request: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID, ", Position=", req.Position)
 
-	playerData, err := h.database.GetPlayerByID(req.PlayerID)
+	playerData, err := h.dataClient.GetPlayerByID(req.PlayerID)
 	if err != nil || playerData == nil {
 		log.Error("Player not found:", req.PlayerID)
 		h.sendItemUseError(msgObj.Session, "Player not found")
 		return
 	}
 
-	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	inventory, err := h.dataClient.GetPlayerInventory(req.PlayerID)
 	if err != nil {
 		log.Error("Failed to get inventory:", err)
 		h.sendItemUseError(msgObj.Session, "Internal error")
 		return
 	}
 
-	var targetItem *db.InventoryItem
+	var targetItem *msg.InventoryItem
 	for _, item := range inventory {
 		if item.Slot == req.Position {
 			targetItem = item
@@ -252,7 +286,7 @@ func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
 		return
 	}
 
-	itemConfig, err := h.database.GetItemConfig(targetItem.ItemID)
+	itemConfig, err := h.dataClient.GetItemConfig(targetItem.ItemID)
 	if err != nil {
 		log.Error("Item config not found:", targetItem.ItemID)
 		h.sendItemUseError(msgObj.Session, "Item config not found")
@@ -282,22 +316,9 @@ func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
 		return
 	}
 
-	err = h.database.SavePlayerData(playerData)
+	err = h.dataClient.UpdatePlayer(playerData)
 	if err != nil {
 		log.Error("Failed to save player data:", err)
-		h.sendItemUseError(msgObj.Session, "Internal error")
-		return
-	}
-
-	targetItem.Count--
-	if targetItem.Count <= 0 {
-		err = h.database.GetDB().Delete(targetItem).Error
-	} else {
-		err = h.database.GetDB().Save(targetItem).Error
-	}
-
-	if err != nil {
-		log.Error("Failed to update inventory:", err)
 		h.sendItemUseError(msgObj.Session, "Internal error")
 		return
 	}

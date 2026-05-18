@@ -1,0 +1,90 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-login",
+            "type": "shell",
+            "command": "go build -o bin/login ./cmd/login",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-gate",
+            "type": "shell",
+            "command": "go build -o bin/gate ./cmd/gate",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-logic",
+            "type": "shell",
+            "command": "go build -o bin/logic ./cmd/logic",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-battle",
+            "type": "shell",
+            "command": "go build -o bin/battle ./cmd/battle",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-gridmap",
+            "type": "shell",
+            "command": "go build -o bin/gridmap ./cmd/gridmap",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-cross",
+            "type": "shell",
+            "command": "go build -o bin/cross ./cmd/cross",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-dataservice",
+            "type": "shell",
+            "command": "go build -o bin/dataservice ./cmd/dataservice",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-gm",
+            "type": "shell",
+            "command": "go build -o bin/gm ./cmd/gm",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        },
+        {
+            "label": "build-webserver",
+            "type": "shell",
+            "command": "go build -o bin/webserver ./cmd/webserver",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "problemMatcher": ["$go"],
+            "dependsOn": ["build-deps"]
+        }
+    ]
+}

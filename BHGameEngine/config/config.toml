@@ -35,10 +35,10 @@ batch_size = 1000
 flush_interval = 5
 
 [gm]
-listen_addr = ":7064"
+listen_addr = ":7067"
 
 [webserver]
-listen_addr = ":7065"
+listen_addr = ":7070"
 
 [mysql]
 host = "localhost"

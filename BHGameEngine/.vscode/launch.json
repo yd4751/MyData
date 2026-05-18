@@ -1,0 +1,151 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Login Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/login",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Gate Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/gate",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Logic Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/logic",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Battle Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/battle",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "GridMap Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/gridmap",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Cross Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cross",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "DataService",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/dataservice",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "GM Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/gm",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "WebServer",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/webserver",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Add Item",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/additem",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "showLog": true
+        }
+    ],
+    "compounds": [
+        {
+            "name": "All Servers",
+            "configurations": [
+                "DataService",
+                "Login Server",
+                "Gate Server",
+                "Logic Server",
+                "Battle Server",
+                "GridMap Server",
+                "Cross Server",
+                "GM Server",
+                "WebServer"
+            ],
+            "stopAll": true
+        },
+        {
+            "name": "Core Servers",
+            "configurations": [
+                "DataService",
+                "Login Server",
+                "Gate Server",
+                "Logic Server"
+            ],
+            "stopAll": true
+        },
+        {
+            "name": "Game Servers",
+            "configurations": [
+                "Battle Server",
+                "GridMap Server",
+                "Cross Server"
+            ],
+            "stopAll": true
+        }
+    ]
+}

@@ -2,7 +2,77 @@ package msg
 
 import (
 	"encoding/json"
+	"sync"
 )
+
+type MessageRouter struct {
+	msgToNodeType map[uint32]NodeType
+	sync.RWMutex
+}
+
+var router = &MessageRouter{
+	msgToNodeType: make(map[uint32]NodeType),
+}
+
+func RegisterMessageRoute(msgID uint32, nodeType NodeType) {
+	router.Lock()
+	defer router.Unlock()
+	router.msgToNodeType[msgID] = nodeType
+}
+
+func GetMessageNodeType(msgID uint32) NodeType {
+	router.RLock()
+	defer router.RUnlock()
+	if nodeType, ok := router.msgToNodeType[msgID]; ok {
+		return nodeType
+	}
+	return NodeTypeGate
+}
+
+func init() {
+	RegisterMessageRoute(MSG_LOGIN_REQ, NodeTypeLogin)
+	RegisterMessageRoute(MSG_LOGIN_RES, NodeTypeLogin)
+	RegisterMessageRoute(MSG_REGISTER_REQ, NodeTypeLogin)
+	RegisterMessageRoute(MSG_REGISTER_RES, NodeTypeLogin)
+
+	RegisterMessageRoute(MSG_LOGOUT_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_LOGOUT_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_PLAYER_INFO_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_PLAYER_INFO_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_PLAYER_MOVE_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_PLAYER_MOVE_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_ATTACK_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_ATTACK_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_SKILL_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_SKILL_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_INVENTORY_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_INVENTORY_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_ITEM_USE_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_ITEM_USE_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_LIST_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_LIST_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_ACCEPT_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_ACCEPT_RES, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_FINISH_REQ, NodeTypeLogic)
+	RegisterMessageRoute(MSG_TASK_FINISH_RES, NodeTypeLogic)
+
+	RegisterMessageRoute(MSG_MAP_LOAD_REQ, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_LOAD_RES, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_ENTITY_REQ, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_ENTITY_RES, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_PLAYER_ENTER, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_PLAYER_LEAVE, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_PLAYER_MOVE, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_PLAYER_SYNC, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_ENTITY_SYNC, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_CROSS_GRID_REQ, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_CROSS_GRID_RES, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_CHUNK_LOAD_REQ, NodeTypeGridMap)
+	RegisterMessageRoute(MSG_MAP_CHUNK_LOAD_RES, NodeTypeGridMap)
+
+	RegisterMessageRoute(MSG_PING, NodeTypeGate)
+	RegisterMessageRoute(MSG_PONG, NodeTypeGate)
+}
 
 type NodeType uint32
 
@@ -176,10 +246,10 @@ type PlayerInfoResponse struct {
 }
 
 type PlayerMoveRequest struct {
-	PlayerID  int64   `json:"player_id"`
-	SessionID string  `json:"session_id"`
-	TargetX   float64 `json:"target_x"`
-	TargetY   float64 `json:"target_y"`
+	PlayerID  int64   `json:"player_id,omitempty"`
+	SessionID string  `json:"session_id,omitempty"`
+	TargetX   float64 `json:"target_x,omitempty"`
+	TargetY   float64 `json:"target_y,omitempty"`
 }
 
 type PlayerMoveResponse struct {
@@ -225,10 +295,20 @@ type InventoryRequest struct {
 	SessionID string `json:"session_id"`
 }
 
+type EquipmentInfo struct {
+	Slot   int32  `json:"slot"`
+	ItemID uint32 `json:"item_id"`
+	Level  int32  `json:"level"`
+}
+
 type InventoryResponse struct {
-	Result  int        `json:"result"`
-	Message string     `json:"message"`
-	Items   []ItemInfo `json:"items"`
+	Result      int             `json:"result"`
+	Message     string          `json:"message"`
+	Items       []ItemInfo      `json:"items"`
+	Gold        int64           `json:"gold"`
+	Equipments  []EquipmentInfo `json:"equipments"`
+	Capacity    int32           `json:"capacity"`
+	ItemConfigs []ItemConfig    `json:"item_configs"`
 }
 
 type ItemInfo struct {
@@ -236,7 +316,9 @@ type ItemInfo struct {
 	Name        string `json:"name"`
 	Icon        string `json:"icon"`
 	Count       int32  `json:"count"`
-	Position    int32  `json:"position"`
+	Slot        int32  `json:"slot"`
+	Level       int32  `json:"level"`
+	UID         string `json:"uid"`
 	Description string `json:"description"`
 }
 

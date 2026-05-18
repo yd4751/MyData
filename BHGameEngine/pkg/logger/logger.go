@@ -93,13 +93,26 @@ func (w *multiWriter) Write(p []byte) (n int, err error) {
 				Timestamp: time.Now().Format("2006-01-02 15:04:05.000"),
 				Level:     getLogLevel(p),
 				Service:   w.serviceName,
-				Message:   string(p),
+				Message:   extractMsg(string(p)),
 			}
 			sendToLogServer(entry)
 		}()
 	}
 
 	return n, err
+}
+
+func extractMsg(logLine string) string {
+	startIdx := bytes.Index([]byte(logLine), []byte(`msg="`))
+	if startIdx == -1 {
+		return logLine
+	}
+	startIdx += 5
+	endIdx := bytes.Index([]byte(logLine[startIdx:]), []byte(`"`))
+	if endIdx == -1 {
+		return logLine[startIdx:]
+	}
+	return logLine[startIdx : startIdx+endIdx]
 }
 
 func getLogLevel(p []byte) string {
