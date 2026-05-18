@@ -16,7 +16,14 @@ type GateHandler struct {
 	cluster     *cluster.Cluster
 	gridRouter  *worldmap.GridMapRouter
 	playerGrids map[int64]int
+	connPool    map[string]*connPoolEntry
 	mu          sync.RWMutex
+	poolMu      sync.RWMutex
+}
+
+type connPoolEntry struct {
+	conns []net.Conn
+	mu    sync.Mutex
 }
 
 func NewGateHandler(cluster *cluster.Cluster) *GateHandler {
@@ -24,34 +31,92 @@ func NewGateHandler(cluster *cluster.Cluster) *GateHandler {
 		cluster:     cluster,
 		gridRouter:  worldmap.NewGridMapRouter(cluster, 9),
 		playerGrids: make(map[int64]int),
+		connPool:    make(map[string]*connPoolEntry),
 	}
+}
+
+func (h *GateHandler) getConnection(addr string) (net.Conn, error) {
+	h.poolMu.RLock()
+	entry, ok := h.connPool[addr]
+	h.poolMu.RUnlock()
+
+	if ok {
+		entry.mu.Lock()
+		if len(entry.conns) > 0 {
+			conn := entry.conns[len(entry.conns)-1]
+			entry.conns = entry.conns[:len(entry.conns)-1]
+			entry.mu.Unlock()
+			log.Info("Reusing connection from pool for ", addr)
+			return conn, nil
+		}
+		entry.mu.Unlock()
+	}
+
+	log.Info("Creating new connection to ", addr)
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func (h *GateHandler) releaseConnection(addr string, conn net.Conn) {
+	h.poolMu.Lock()
+	entry, ok := h.connPool[addr]
+	if !ok {
+		entry = &connPoolEntry{
+			conns: make([]net.Conn, 0, 10),
+		}
+		h.connPool[addr] = entry
+	}
+	h.poolMu.Unlock()
+
+	entry.mu.Lock()
+	if len(entry.conns) < 10 {
+		entry.conns = append(entry.conns, conn)
+	} else {
+		conn.Close()
+	}
+	entry.mu.Unlock()
 }
 
 func (h *GateHandler) Handle(msgObj *network.Message) {
-	log.Info("Gate received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), "), NodeType:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
+	if msgObj.ID != msg.MSG_PING {
+		log.Info("Gate received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+	}
 
-	if msgObj.NodeType == msg.NodeTypeGate {
-		h.handleGateMessage(msgObj)
-	} else {
-		h.forwardMessage(msgObj)
+	targetNodeType := msg.GetMessageNodeType(msgObj.ID)
+	h.routeMessage(msgObj, targetNodeType)
+}
+
+func (h *GateHandler) routeMessage(msgObj *network.Message, targetNodeType msg.NodeType) {
+	switch targetNodeType {
+	case msg.NodeTypeGate:
+		return
+	case msg.NodeTypeGridMap:
+		h.handleGridMapMessage(msgObj)
+	default:
+		h.forwardToService(msgObj, targetNodeType)
 	}
 }
 
-func (h *GateHandler) handleGateMessage(msgObj *network.Message) {
+func (h *GateHandler) handleGridMapMessage(msgObj *network.Message) {
 	switch msgObj.ID {
 	case msg.MSG_MAP_PLAYER_ENTER:
 		h.handleMapPlayerEnter(msgObj)
 	case msg.MSG_MAP_PLAYER_MOVE:
 		h.handleMapPlayerMove(msgObj)
+	case msg.MSG_MAP_PLAYER_LEAVE:
+		h.handleMapPlayerLeave(msgObj)
 	default:
-		log.Info("Handling gate message, MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+		h.forwardToRandomGridMap(msgObj)
 	}
 }
 
 func (h *GateHandler) handleMapPlayerEnter(msgObj *network.Message) {
 	var req msg.MapPlayerEnterRequest
-	err := json.Unmarshal(msgObj.Data, &req)
-	if err != nil {
+	if err := json.Unmarshal(msgObj.Data, &req); err != nil {
 		log.Error("Failed to unmarshal MapPlayerEnterRequest: ", err)
 		return
 	}
@@ -67,8 +132,7 @@ func (h *GateHandler) handleMapPlayerEnter(msgObj *network.Message) {
 
 func (h *GateHandler) handleMapPlayerMove(msgObj *network.Message) {
 	var req msg.MapPlayerMoveRequest
-	err := json.Unmarshal(msgObj.Data, &req)
-	if err != nil {
+	if err := json.Unmarshal(msgObj.Data, &req); err != nil {
 		log.Error("Failed to unmarshal MapPlayerMoveRequest: ", err)
 		return
 	}
@@ -97,39 +161,39 @@ func (h *GateHandler) handleMapPlayerMove(msgObj *network.Message) {
 	h.forwardToGridMap(newGridID, msgObj)
 }
 
-func (h *GateHandler) forwardMessage(msgObj *network.Message) {
-	if msgObj.NodeType == msg.NodeTypeGridMap {
-		var playerID int64
-		switch msgObj.ID {
-		case msg.MSG_MAP_PLAYER_ENTER:
-			var req msg.MapPlayerEnterRequest
-			json.Unmarshal(msgObj.Data, &req)
-			playerID = req.PlayerID
-		case msg.MSG_MAP_PLAYER_MOVE:
-			var req msg.MapPlayerMoveRequest
-			json.Unmarshal(msgObj.Data, &req)
-			playerID = req.PlayerID
-		case msg.MSG_MAP_PLAYER_LEAVE:
-			var req msg.MapPlayerLeaveRequest
-			json.Unmarshal(msgObj.Data, &req)
-			playerID = req.PlayerID
-		}
-
-		if playerID != 0 {
-			h.mu.RLock()
-			gridID, ok := h.playerGrids[playerID]
-			h.mu.RUnlock()
-
-			if ok {
-				h.forwardToGridMap(gridID, msgObj)
-				return
-			}
-		}
+func (h *GateHandler) handleMapPlayerLeave(msgObj *network.Message) {
+	var req msg.MapPlayerLeaveRequest
+	if err := json.Unmarshal(msgObj.Data, &req); err != nil {
+		log.Error("Failed to unmarshal MapPlayerLeaveRequest: ", err)
+		return
 	}
 
-	serviceName := h.getServiceNameByNodeType(msgObj.NodeType)
+	h.mu.RLock()
+	gridID, ok := h.playerGrids[req.PlayerID]
+	h.mu.RUnlock()
+
+	if ok {
+		h.forwardToGridMap(gridID, msgObj)
+
+		h.mu.Lock()
+		delete(h.playerGrids, req.PlayerID)
+		h.mu.Unlock()
+	}
+}
+
+func (h *GateHandler) forwardToRandomGridMap(msgObj *network.Message) {
+	services, err := h.cluster.DiscoverServices("gridmap-0")
+	if err != nil || len(services) == 0 {
+		log.Error("Failed to find gridmap service: ", err)
+		return
+	}
+	h.sendToService(services[0].Addr, msgObj)
+}
+
+func (h *GateHandler) forwardToService(msgObj *network.Message, nodeType msg.NodeType) {
+	serviceName := h.getServiceNameByNodeType(nodeType)
 	if serviceName == "" {
-		log.Error("Unknown node type:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
+		log.Error("Unknown node type:", nodeType, "(", nodeType.String(), ")")
 		return
 	}
 
@@ -156,12 +220,12 @@ func (h *GateHandler) forwardToGridMap(gridID int, msgObj *network.Message) {
 
 func (h *GateHandler) sendToService(addr string, msgObj *network.Message) {
 	log.Info("Connecting to service at ", addr)
-	conn, err := net.Dial("tcp", addr)
+	conn, err := h.getConnection(addr)
 	if err != nil {
 		log.Error("Failed to connect to service at ", addr, ": ", err)
 		return
 	}
-	defer conn.Close()
+	defer h.releaseConnection(addr, conn)
 
 	err = network.SendRawMessage(conn, msgObj.ID, msgObj.NodeType, msgObj.Data)
 	if err != nil {

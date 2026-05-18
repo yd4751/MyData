@@ -440,16 +440,21 @@ func (d *Database) AddItemToInventory(playerID int64, itemID int64, count int32)
 	err := d.db.Where("player_id = ? AND item_id = ?", playerID, itemID).First(&existingItem).Error
 
 	if err == gorm.ErrRecordNotFound {
-		var maxSlot int32
+		var maxSlot *int32
 		err := d.db.Model(&InventoryItem{}).Where("player_id = ?", playerID).Select("MAX(slot)").Scan(&maxSlot).Error
 		if err != nil && err != gorm.ErrRecordNotFound {
 			return err
 		}
 
+		slot := int32(1)
+		if maxSlot != nil {
+			slot = *maxSlot + 1
+		}
+
 		newItem := &InventoryItem{
 			PlayerID: playerID,
 			ItemID:   itemID,
-			Slot:     maxSlot + 1,
+			Slot:     slot,
 			Count:    count,
 		}
 		return d.db.Create(newItem).Error

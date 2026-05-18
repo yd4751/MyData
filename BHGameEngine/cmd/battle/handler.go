@@ -5,11 +5,12 @@ import (
 
 	"github.com/openworld-server/internal/battlecore"
 	"github.com/openworld-server/internal/entity"
+	"github.com/openworld-server/internal/log"
+	"github.com/openworld-server/internal/msg"
 	"github.com/openworld-server/internal/network"
 	"github.com/openworld-server/internal/player"
 	"github.com/openworld-server/internal/skill"
 	"github.com/openworld-server/internal/worldmap"
-	"github.com/openworld-server/pkg/logger"
 )
 
 type BattleHandler struct {
@@ -22,51 +23,53 @@ func NewBattleHandler() *BattleHandler {
 	}
 }
 
-func (h *BattleHandler) Handle(msg *network.Message) {
-	switch msg.ID {
-	case 4001:
-		h.handleAttack(msg)
-	case 4003:
-		h.handleSkill(msg)
-	case 4005:
-		h.handleBattleEnd(msg)
+func (h *BattleHandler) Handle(msgObj *network.Message) {
+	log.Info("Battle server received message - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+
+	switch msgObj.ID {
+	case msg.MSG_ATTACK_REQ:
+		h.handleAttack(msgObj)
+	case msg.MSG_SKILL_REQ:
+		h.handleSkill(msgObj)
+	case msg.MSG_BATTLE_END_REQ:
+		h.handleBattleEnd(msgObj)
 	default:
-		logger.Info("Battle server received unknown message ID: ", msg.ID)
+		log.Warn("Unknown message ID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
 	}
 }
 
-func (h *BattleHandler) handleAttack(msg *network.Message) {
+func (h *BattleHandler) handleAttack(msgObj *network.Message) {
 	var req struct {
 		BattleID int64 `json:"battle_id"`
 		PlayerID int64 `json:"player_id"`
 		TargetID int64 `json:"target_id"`
 	}
 
-	err := json.Unmarshal(msg.Data, &req)
+	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
-		logger.Error("Failed to unmarshal attack request: ", err)
+		log.Error("Failed to unmarshal attack request: ", err)
 		return
 	}
 
 	battle, ok := h.battleManager.GetBattle(req.BattleID)
 	if !ok {
-		logger.Error("Battle not found: ", req.BattleID)
+		log.Error("Battle not found: ", req.BattleID)
 		return
 	}
 
-	player, ok := battle.GetPlayer(req.PlayerID)
+	p, ok := battle.GetPlayer(req.PlayerID)
 	if !ok {
-		logger.Error("Player not found: ", req.PlayerID)
+		log.Error("Player not found: ", req.PlayerID)
 		return
 	}
 
 	monster, monsterOk := battle.GetMonster(req.TargetID)
 	if !monsterOk {
-		logger.Error("Monster not found: ", req.TargetID)
+		log.Error("Monster not found: ", req.TargetID)
 		return
 	}
 
-	combatLog := battlecore.ProcessMonsterAttack(monster, player)
+	combatLog := battlecore.ProcessMonsterAttack(monster, p)
 	if combatLog != nil {
 		battle.AddCombatLog(combatLog)
 	}
@@ -78,10 +81,10 @@ func (h *BattleHandler) handleAttack(msg *network.Message) {
 		"target_id":   req.TargetID,
 	}
 
-	h.sendResponse(msg.Session, 4002, response)
+	h.sendResponse(msgObj.Session, msg.MSG_ATTACK_RES, response)
 }
 
-func (h *BattleHandler) handleSkill(msg *network.Message) {
+func (h *BattleHandler) handleSkill(msgObj *network.Message) {
 	var req struct {
 		BattleID int64 `json:"battle_id"`
 		PlayerID int64 `json:"player_id"`
@@ -89,40 +92,40 @@ func (h *BattleHandler) handleSkill(msg *network.Message) {
 		TargetID int64 `json:"target_id"`
 	}
 
-	err := json.Unmarshal(msg.Data, &req)
+	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
-		logger.Error("Failed to unmarshal skill request: ", err)
+		log.Error("Failed to unmarshal skill request: ", err)
 		return
 	}
 
 	battle, ok := h.battleManager.GetBattle(req.BattleID)
 	if !ok {
-		logger.Error("Battle not found: ", req.BattleID)
-		h.sendError(msg.Session, 4004, "battle not found")
+		log.Error("Battle not found: ", req.BattleID)
+		h.sendError(msgObj.Session, msg.MSG_SKILL_RES, "battle not found")
 		return
 	}
 
 	if !battle.IsActive() {
-		logger.Error("Battle is not active: ", req.BattleID)
-		h.sendError(msg.Session, 4004, "battle not active")
+		log.Error("Battle is not active: ", req.BattleID)
+		h.sendError(msgObj.Session, msg.MSG_SKILL_RES, "battle not active")
 		return
 	}
 
 	caster, ok := battle.GetPlayer(req.PlayerID)
 	if !ok {
-		logger.Error("Caster not found in battle: ", req.PlayerID)
-		h.sendError(msg.Session, 4004, "caster not found")
+		log.Error("Caster not found in battle: ", req.PlayerID)
+		h.sendError(msgObj.Session, msg.MSG_SKILL_RES, "caster not found")
 		return
 	}
 
-	log, err := battle.CastSkill(caster, req.SkillID, req.TargetID)
+	skillLog, err := battle.CastSkill(caster, req.SkillID, req.TargetID)
 	if err != nil {
-		logger.Error("Failed to cast skill: ", err)
-		h.sendError(msg.Session, 4004, err.Error())
+		log.Error("Failed to cast skill: ", err)
+		h.sendError(msgObj.Session, msg.MSG_SKILL_RES, err.Error())
 		return
 	}
 
-	logger.Info("Skill cast successful: ", req.SkillID, " by ", req.PlayerID, " on ", req.TargetID)
+	log.Info("Skill cast successful: ", req.SkillID, " by ", req.PlayerID, " on ", req.TargetID)
 
 	response := map[string]interface{}{
 		"result":    0,
@@ -131,12 +134,12 @@ func (h *BattleHandler) handleSkill(msg *network.Message) {
 		"caster_id": req.PlayerID,
 		"skill_id":  req.SkillID,
 		"target_id": req.TargetID,
-		"damage":    log.Damage,
-		"heal":      log.Heal,
-		"is_combo":  log.IsCombo,
+		"damage":    skillLog.Damage,
+		"heal":      skillLog.Heal,
+		"is_combo":  skillLog.IsCombo,
 	}
 
-	h.sendResponse(msg.Session, 4004, response)
+	h.sendResponse(msgObj.Session, msg.MSG_SKILL_RES, response)
 
 	if battle.CheckBattleEnd() {
 		rewards := battle.GetRewards()
@@ -148,23 +151,23 @@ func (h *BattleHandler) handleSkill(msg *network.Message) {
 			"battle_id": req.BattleID,
 			"rewards":   rewards,
 		}
-		h.sendResponse(msg.Session, 4006, battleEndResponse)
+		h.sendResponse(msgObj.Session, msg.MSG_BATTLE_END_RES, battleEndResponse)
 	}
 }
 
-func (h *BattleHandler) handleBattleEnd(msg *network.Message) {
+func (h *BattleHandler) handleBattleEnd(msgObj *network.Message) {
 	var req struct {
 		BattleID int64 `json:"battle_id"`
 	}
 
-	err := json.Unmarshal(msg.Data, &req)
+	err := json.Unmarshal(msgObj.Data, &req)
 	if err != nil {
-		logger.Error("Failed to unmarshal battle end request: ", err)
+		log.Error("Failed to unmarshal battle end request: ", err)
 		return
 	}
 
 	h.battleManager.EndBattle(req.BattleID)
-	logger.Info("Ended battle: ", req.BattleID)
+	log.Info("Ended battle: ", req.BattleID)
 
 	response := map[string]interface{}{
 		"result":    0,
@@ -172,13 +175,13 @@ func (h *BattleHandler) handleBattleEnd(msg *network.Message) {
 		"battle_id": req.BattleID,
 	}
 
-	h.sendResponse(msg.Session, 4006, response)
+	h.sendResponse(msgObj.Session, msg.MSG_BATTLE_END_RES, response)
 }
 
 func (h *BattleHandler) sendResponse(conn interface{ Write([]byte) (int, error) }, msgID uint32, data interface{}) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		logger.Error("Failed to marshal response: ", err)
+		log.Error("Failed to marshal response: ", err)
 		return
 	}
 

@@ -7,7 +7,7 @@ import (
 	"syscall"
 
 	"github.com/openworld-server/internal/cluster"
-	"github.com/openworld-server/internal/db"
+	"github.com/openworld-server/internal/dataclient"
 	"github.com/openworld-server/internal/log"
 	"github.com/openworld-server/internal/network"
 	"github.com/openworld-server/internal/redis"
@@ -44,22 +44,6 @@ func main() {
 	}
 	log.Info("Connected to Redis successfully")
 
-	mysqlConfig := config.GetMySQLConfig()
-	log.Info("Connecting to MySQL at ", mysqlConfig.Host, ":", mysqlConfig.Port)
-	database, err := db.NewDatabase(db.DBConfig{
-		Host:         mysqlConfig.Host,
-		Port:         mysqlConfig.Port,
-		User:         mysqlConfig.User,
-		Password:     mysqlConfig.Password,
-		DBName:       mysqlConfig.DBName,
-		MaxOpenConns: mysqlConfig.MaxOpenConns,
-		MaxIdleConns: mysqlConfig.MaxIdleConns,
-	})
-	if err != nil {
-		log.Fatal("Failed to connect to MySQL:", err)
-	}
-	log.Info("Connected to MySQL successfully")
-
 	etcdAddr := config.GetEtcdAddr()
 	log.Info("Connecting to etcd at ", etcdAddr)
 	cluster, err := cluster.NewCluster(etcdAddr)
@@ -71,6 +55,8 @@ func main() {
 	logger.SetCluster(cluster)
 	go logger.StartLogServerDiscovery()
 
+	dataClient := dataclient.NewDataClient(cluster)
+
 	listenAddr := config.GetLogicListenAddr()
 	log.Info("Registering logic service at ", listenAddr)
 	err = cluster.RegisterService("logic", listenAddr, map[string]string{
@@ -81,7 +67,7 @@ func main() {
 	}
 
 	log.Info("Creating LogicHandler and starting network server")
-	handler := NewLogicHandler(database, redisClient)
+	handler := NewLogicHandler(dataClient, redisClient)
 	server := network.NewServer(handler)
 
 	go func() {
@@ -98,6 +84,5 @@ func main() {
 	log.Info("Shutting down logic server...")
 	server.Stop()
 	redisClient.Close()
-	database.Close()
 	log.Info("Logic server shutdown complete")
 }

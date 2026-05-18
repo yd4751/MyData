@@ -27,17 +27,13 @@ func NewLoginHandler(dataClient *dataclient.DataClient, redisClient *redis.Redis
 }
 
 func (h *LoginHandler) Handle(msgObj *network.Message) {
-	log.Info("Login server received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), "), NodeType:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
+	log.Info("Login server received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
 
 	switch msgObj.ID {
 	case msg.MSG_LOGIN_REQ:
 		h.handleLogin(msgObj)
 	case msg.MSG_REGISTER_REQ:
 		h.handleRegister(msgObj)
-	case msg.MSG_LOGOUT_REQ:
-		h.handleLogout(msgObj)
-	case msg.MSG_PLAYER_INFO_REQ:
-		h.handlePlayerInfoRequest(msgObj)
 	default:
 		log.Warn("Unknown message ID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
 	}
@@ -73,22 +69,22 @@ func (h *LoginHandler) handleLogin(msgObj *network.Message) {
 		return
 	}
 
-	sessionID := generateSessionID()
-	err = h.redisClient.SetSession(sessionID, account.ID, 24*time.Hour)
-	if err != nil {
-		log.Error("Failed to set session:", err)
-		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Internal error")
-		return
-	}
-
-	log.Info("Session created: SessionID=", sessionID, ", AccountID=", account.ID)
-
 	player, err := h.dataClient.GetPlayerByAccountID(account.ID)
 	if err != nil {
 		log.Error("Failed to get player:", err)
 		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Internal error")
 		return
 	}
+
+	sessionID := generateSessionID()
+	err = h.redisClient.SetSession(sessionID, player.ID, 24*time.Hour)
+	if err != nil {
+		log.Error("Failed to set session:", err)
+		h.sendError(msgObj.Session, msg.MSG_LOGIN_RES, "Internal error")
+		return
+	}
+
+	log.Info("Session created: SessionID=", sessionID, ", PlayerID=", player.ID)
 
 	resp := msg.LoginResponse{
 		Result:     0,
