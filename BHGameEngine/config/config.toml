@@ -1,0 +1,63 @@
+[gate]
+listen_addr = ":7060"
+max_connections = 10000
+ping_interval = 30
+ping_timeout = 120
+encrypt = true
+
+[login]
+listen_addr = ":7061"
+session_expire = 3600
+
+[etcd]
+addr = "localhost:2379"
+
+[gridmap]
+listen_addr = ":7062"
+chunk_size = 256
+view_distance = 3
+max_players_per_chunk = 100
+
+[logic]
+listen_addr = ":7063"
+max_players = 5000
+
+[battle]
+listen_addr = ":7064"
+max_battles = 1000
+
+[cross]
+listen_addr = ":7065"
+
+[dataservice]
+listen_addr = ":7066"
+batch_size = 1000
+flush_interval = 5
+
+[gm]
+listen_addr = ":7064"
+
+[webserver]
+listen_addr = ":7065"
+
+[mysql]
+host = "localhost"
+port = 3306
+user = "root"
+password = "12345678"
+db_name = "openworld"
+max_open_conns = 100
+max_idle_conns = 20
+
+[redis]
+addr = "localhost:6379"
+password = ""
+db = 0
+pool_size = 100
+
+[logger]
+level = "info"
+path = "./logs"
+
+[snowflake]
+worker_id = 1

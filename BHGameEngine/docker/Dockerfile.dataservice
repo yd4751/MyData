@@ -1,0 +1,14 @@
+FROM golang:1.22-alpine
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o dataservice cmd/dataservice/main.go
+
+EXPOSE 8087
+
+CMD ["./dataservice", "-config", "config/config.toml"]

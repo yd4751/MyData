@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "./pkg/proto";
+
+message Vector3 {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message PlayerInfo {
+    int64 player_id = 1;
+    string name = 2;
+    int32 level = 3;
+    Vector3 position = 4;
+    float rotation = 5;
+    int32 health = 6;
+    int32 max_health = 7;
+    int32 mana = 8;
+    int32 max_mana = 9;
+    int32 stamina = 10;
+    int32 max_stamina = 11;
+    int32 state = 12;
+}
+
+message EntityInfo {
+    int64 entity_id = 1;
+    int32 entity_type = 2;
+    string name = 3;
+    Vector3 position = 4;
+    float rotation = 5;
+    int32 health = 6;
+    int32 max_health = 7;
+    int32 state = 8;
+    int32 level = 9;
+}
+
+message ChunkInfo {
+    int32 chunk_x = 1;
+    int32 chunk_y = 2;
+    bool loaded = 3;
+    bool active = 4;
+}
+
+message LoginRequest {
+    string account = 1;
+    string password = 2;
+    string device_id = 3;
+}
+
+message LoginResponse {
+    int32 result = 1;
+    string session_id = 2;
+    PlayerInfo player_info = 3;
+    repeated string servers = 4;
+}
+
+message EnterWorldRequest {
+    string session_id = 1;
+    int64 player_id = 2;
+    Vector3 position = 3;
+}
+
+message EnterWorldResponse {
+    int32 result = 1;
+    repeated ChunkInfo chunks = 2;
+    repeated EntityInfo entities = 3;
+}
+
+message MoveRequest {
+    int64 player_id = 1;
+    Vector3 position = 2;
+    float rotation = 3;
+}
+
+message MoveResponse {
+    int32 result = 1;
+    Vector3 position = 2;
+}
+
+message SkillRequest {
+    int64 player_id = 1;
+    int32 skill_id = 2;
+    int64 target_id = 3;
+}
+
+message SkillResponse {
+    int32 result = 1;
+    int32 damage = 2;
+}
+
+message ChatRequest {
+    int64 player_id = 1;
+    int32 channel = 2;
+    string content = 3;
+}
+
+message ChatResponse {
+    int32 result = 1;
+}
+
+message ChatBroadcast {
+    int64 player_id = 1;
+    string player_name = 2;
+    int32 channel = 3;
+    string content = 4;
+}
+
+message EntitySync {
+    repeated EntityInfo entities = 1;
+}
+
+message PlayerSync {
+    repeated PlayerInfo players = 1;
+}
+
+message ChunkLoad {
+    repeated ChunkInfo chunks = 1;
+}
+
+message ChunkUnload {
+    repeated ChunkInfo chunks = 1;
+}
+
+message ErrorResponse {
+    int32 error_code = 1;
+    string error_message = 2;
+}
+
+message Ping {
+    int64 timestamp = 1;
+}
+
+message Pong {
+    int64 timestamp = 1;
+}
+
+service GateService {
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc EnterWorld(EnterWorldRequest) returns (EnterWorldResponse);
+    rpc Move(MoveRequest) returns (MoveResponse);
+    rpc Skill(SkillRequest) returns (SkillResponse);
+    rpc Chat(ChatRequest) returns (ChatResponse);
+}
+
+service GridMapService {
+    rpc GetChunks(EnterWorldRequest) returns (ChunkLoad);
+    rpc UpdatePlayerPosition(MoveRequest) returns (MoveResponse);
+    rpc GetEntities(EnterWorldRequest) returns (EntitySync);
+}
+
+service BattleService {
+    rpc ProcessSkill(SkillRequest) returns (SkillResponse);
+}
+
+service CrossService {
+    rpc GetCrossServerPlayers(EnterWorldRequest) returns (PlayerSync);
+}
+
+service DataService {
+    rpc SavePlayerData(PlayerInfo) returns (ErrorResponse);
+    rpc LoadPlayerData(LoginRequest) returns (PlayerInfo);
+}

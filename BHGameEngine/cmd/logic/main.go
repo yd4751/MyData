@@ -1,0 +1,443 @@
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/openworld-server/internal/cluster"
+	"github.com/openworld-server/internal/db"
+	"github.com/openworld-server/internal/log"
+	"github.com/openworld-server/internal/msg"
+	"github.com/openworld-server/internal/network"
+	"github.com/openworld-server/internal/redis"
+	"github.com/openworld-server/pkg/config"
+)
+
+var configPath = flag.String("config", "./config/config.toml", "config file path")
+
+type LogicHandler struct {
+	database    *db.Database
+	redisClient *redis.RedisClient
+}
+
+func (h *LogicHandler) Handle(msgObj *network.Message) {
+	log.Info("Logic server received message from ", msgObj.Session.RemoteAddr(), " - MsgID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), "), NodeType:", msgObj.NodeType, "(", msgObj.NodeType.String(), ")")
+
+	switch msgObj.ID {
+	case msg.MSG_PLAYER_INFO_REQ:
+		h.handlePlayerInfo(msgObj)
+	case msg.MSG_PLAYER_MOVE_REQ:
+		h.handlePlayerMove(msgObj)
+	case msg.MSG_INVENTORY_REQ:
+		h.handleInventoryRequest(msgObj)
+	case msg.MSG_ITEM_USE_REQ:
+		h.handleItemUseRequest(msgObj)
+	default:
+		log.Warn("Unknown message ID:", msgObj.ID, "(", msg.GetMsgName(msgObj.ID), ")")
+	}
+}
+
+func (h *LogicHandler) handlePlayerInfo(msgObj *network.Message) {
+	var req msg.PlayerInfoRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse player info request:", err)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Invalid request")
+		return
+	}
+
+	log.Info("Player info request: PlayerID=", req.PlayerID)
+
+	player, err := h.database.GetPlayerByID(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get player:", err)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Player not found")
+		return
+	}
+
+	if player == nil {
+		log.Warn("Player not found: PlayerID=", req.PlayerID)
+		h.sendError(msgObj.Session, msg.MSG_PLAYER_INFO_RES, "Player not found")
+		return
+	}
+
+	resp := msg.PlayerInfoResponse{
+		Result:     0,
+		PlayerID:   player.ID,
+		PlayerName: player.Name,
+		Level:      player.Level,
+		Exp:        player.Exp,
+		Health:     player.Health,
+		MaxHealth:  player.MaxHealth,
+		Mana:       player.Mana,
+		MaxMana:    player.MaxMana,
+		PositionX:  player.PosX,
+		PositionY:  player.PosY,
+	}
+
+	log.Info("Player info response sent: PlayerID=", req.PlayerID)
+	h.sendResponse(msgObj.Session, msg.MSG_PLAYER_INFO_RES, resp)
+}
+
+func (h *LogicHandler) handlePlayerMove(msgObj *network.Message) {
+	var req msg.PlayerMoveRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse player move request:", err)
+		h.sendMoveError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	log.Info("Player move request: PlayerID=", req.PlayerID, ", TargetX=", req.TargetX, ", TargetY=", req.TargetY)
+
+	err = h.database.UpdatePlayerPosition(req.PlayerID, req.TargetX, req.TargetY)
+	if err != nil {
+		log.Error("Failed to update player position:", err)
+		h.sendMoveError(msgObj.Session, "Internal error")
+		return
+	}
+
+	resp := msg.PlayerMoveResponse{
+		Result: 0,
+		PosX:   req.TargetX,
+		PosY:   req.TargetY,
+	}
+
+	log.Info("Player move response sent: PlayerID=", req.PlayerID)
+	h.sendMoveResponse(msgObj.Session, resp)
+}
+
+func (h *LogicHandler) sendError(conn net.Conn, msgID uint32, message string) {
+	resp := msg.PlayerInfoResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendResponse(conn, msgID, resp)
+}
+
+func (h *LogicHandler) sendResponse(conn net.Conn, msgID uint32, data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal response:", err)
+		return
+	}
+
+	log.Debug("Sending response - MsgID:", msgID, "(", msg.GetMsgName(msgID), "), Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msgID, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send response:", err)
+	}
+}
+
+func (h *LogicHandler) sendMoveError(conn net.Conn, message string) {
+	resp := msg.PlayerMoveResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendMoveResponse(conn, resp)
+}
+
+func (h *LogicHandler) sendMoveResponse(conn net.Conn, data msg.PlayerMoveResponse) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal response:", err)
+		return
+	}
+
+	log.Debug("Sending move response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_PLAYER_MOVE_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send response:", err)
+	}
+}
+
+func (h *LogicHandler) handleInventoryRequest(msgObj *network.Message) {
+	var req msg.InventoryRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse inventory request:", err)
+		h.sendInventoryError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	log.Info("Inventory request: PlayerID=", req.PlayerID)
+
+	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get player inventory:", err)
+		h.sendInventoryError(msgObj.Session, "Internal error")
+		return
+	}
+
+	items := make([]msg.ItemInfo, 0)
+	for _, item := range inventory {
+		itemConfig, err := h.database.GetItemConfig(item.ItemID)
+		if err != nil {
+			log.Warn("Item config not found for item ID:", item.ItemID)
+			items = append(items, msg.ItemInfo{
+				ItemID:      uint32(item.ItemID),
+				Name:        "未知道具",
+				Icon:        "unknown",
+				Count:       item.Count,
+				Position:    item.Slot,
+				Description: "未知道具",
+			})
+			continue
+		}
+
+		items = append(items, msg.ItemInfo{
+			ItemID:      uint32(item.ItemID),
+			Name:        itemConfig.Name,
+			Icon:        itemConfig.Icon,
+			Count:       item.Count,
+			Position:    item.Slot,
+			Description: itemConfig.Description,
+		})
+	}
+
+	resp := msg.InventoryResponse{
+		Result: 0,
+		Items:  items,
+	}
+
+	log.Info("Inventory response sent: PlayerID=", req.PlayerID, ", ItemCount=", len(items))
+	h.sendInventoryResponse(msgObj.Session, resp)
+}
+
+func (h *LogicHandler) handleItemUseRequest(msgObj *network.Message) {
+	var req msg.ItemUseRequest
+	err := json.Unmarshal(msgObj.Data, &req)
+	if err != nil {
+		log.Error("Failed to parse item use request:", err)
+		h.sendItemUseError(msgObj.Session, "Invalid request")
+		return
+	}
+
+	log.Info("Item use request: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID, ", Position=", req.Position)
+
+	playerData, err := h.database.GetPlayerByID(req.PlayerID)
+	if err != nil || playerData == nil {
+		log.Error("Player not found:", req.PlayerID)
+		h.sendItemUseError(msgObj.Session, "Player not found")
+		return
+	}
+
+	inventory, err := h.database.GetPlayerInventory(req.PlayerID)
+	if err != nil {
+		log.Error("Failed to get inventory:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	var targetItem *db.InventoryItem
+	for _, item := range inventory {
+		if item.Slot == req.Position {
+			targetItem = item
+			break
+		}
+	}
+
+	if targetItem == nil {
+		log.Warn("Item not found in slot:", req.Position)
+		h.sendItemUseError(msgObj.Session, "Item not found")
+		return
+	}
+
+	if targetItem.Count <= 0 {
+		log.Warn("Item count is zero:", req.Position)
+		h.sendItemUseError(msgObj.Session, "Item count is zero")
+		return
+	}
+
+	itemConfig, err := h.database.GetItemConfig(targetItem.ItemID)
+	if err != nil {
+		log.Error("Item config not found:", targetItem.ItemID)
+		h.sendItemUseError(msgObj.Session, "Item config not found")
+		return
+	}
+
+	if itemConfig.Type != 1 {
+		log.Warn("Item is not consumable:", targetItem.ItemID)
+		h.sendItemUseError(msgObj.Session, "Item is not consumable")
+		return
+	}
+
+	switch itemConfig.EffectType {
+	case 1:
+		playerData.Health += itemConfig.EffectValue
+		if playerData.Health > playerData.MaxHealth {
+			playerData.Health = playerData.MaxHealth
+		}
+	case 2:
+		playerData.Mana += itemConfig.EffectValue
+		if playerData.Mana > playerData.MaxMana {
+			playerData.Mana = playerData.MaxMana
+		}
+	default:
+		log.Warn("Unknown effect type:", itemConfig.EffectType)
+		h.sendItemUseError(msgObj.Session, "Unknown effect type")
+		return
+	}
+
+	err = h.database.SavePlayerData(playerData)
+	if err != nil {
+		log.Error("Failed to save player data:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	targetItem.Count--
+	if targetItem.Count <= 0 {
+		err = h.database.GetDB().Delete(targetItem).Error
+	} else {
+		err = h.database.GetDB().Save(targetItem).Error
+	}
+
+	if err != nil {
+		log.Error("Failed to update inventory:", err)
+		h.sendItemUseError(msgObj.Session, "Internal error")
+		return
+	}
+
+	resp := msg.ItemUseResponse{
+		Result:  0,
+		Message: "Use success",
+	}
+
+	log.Info("Item use response sent: PlayerID=", req.PlayerID, ", ItemID=", req.ItemID)
+	h.sendItemUseResponse(msgObj.Session, resp)
+}
+
+func (h *LogicHandler) sendInventoryError(conn net.Conn, message string) {
+	resp := msg.InventoryResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendInventoryResponse(conn, resp)
+}
+
+func (h *LogicHandler) sendInventoryResponse(conn net.Conn, data msg.InventoryResponse) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal inventory response:", err)
+		return
+	}
+
+	log.Debug("Sending inventory response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_INVENTORY_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send inventory response:", err)
+	}
+}
+
+func (h *LogicHandler) sendItemUseError(conn net.Conn, message string) {
+	resp := msg.ItemUseResponse{
+		Result:  1,
+		Message: message,
+	}
+	h.sendItemUseResponse(conn, resp)
+}
+
+func (h *LogicHandler) sendItemUseResponse(conn net.Conn, data msg.ItemUseResponse) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Failed to marshal item use response:", err)
+		return
+	}
+
+	log.Debug("Sending item use response - Length:", len(jsonData))
+	err = network.SendRawMessage(conn, msg.MSG_ITEM_USE_RES, msg.NodeTypeLogic, jsonData)
+	if err != nil {
+		log.Error("Failed to send item use response:", err)
+	}
+}
+
+func main() {
+	flag.Parse()
+
+	log.Info("Logic server initializing...")
+
+	err := config.LoadConfig(*configPath)
+	if err != nil {
+		log.Fatal("Failed to load config:", err)
+	}
+
+	logger := log.NewLogger("logic")
+	loggerConfig := config.GetLoggerConfig()
+	logger.Init(loggerConfig.Path, loggerConfig.Level)
+	log.Info("Logic server using log config: Path=", loggerConfig.Path, ", Level=", loggerConfig.Level)
+
+	redisConfig := config.GetRedisConfig()
+	log.Info("Connecting to Redis at ", redisConfig.Addr)
+	redisClient := redis.NewRedisClient(redis.RedisConfig{
+		Addr:     redisConfig.Addr,
+		Password: redisConfig.Password,
+		DB:       redisConfig.DB,
+		PoolSize: redisConfig.PoolSize,
+	})
+	if err := redisClient.Ping(); err != nil {
+		log.Fatal("Failed to connect to Redis:", err)
+	}
+	log.Info("Connected to Redis successfully")
+
+	mysqlConfig := config.GetMySQLConfig()
+	log.Info("Connecting to MySQL at ", mysqlConfig.Host, ":", mysqlConfig.Port)
+	database, err := db.NewDatabase(db.DBConfig{
+		Host:         mysqlConfig.Host,
+		Port:         mysqlConfig.Port,
+		User:         mysqlConfig.User,
+		Password:     mysqlConfig.Password,
+		DBName:       mysqlConfig.DBName,
+		MaxOpenConns: mysqlConfig.MaxOpenConns,
+		MaxIdleConns: mysqlConfig.MaxIdleConns,
+	})
+	if err != nil {
+		log.Fatal("Failed to connect to MySQL:", err)
+	}
+	log.Info("Connected to MySQL successfully")
+
+	etcdAddr := config.GetEtcdAddr()
+	log.Info("Connecting to etcd at ", etcdAddr)
+	cluster, err := cluster.NewCluster(etcdAddr)
+	if err != nil {
+		log.Fatal("Failed to connect to etcd:", err)
+	}
+	log.Info("Connected to etcd successfully")
+
+	logger.SetCluster(cluster)
+	go logger.StartLogServerDiscovery()
+
+	listenAddr := config.GetLogicListenAddr()
+	log.Info("Registering logic service at ", listenAddr)
+	err = cluster.RegisterService("logic", listenAddr, map[string]string{
+		"type": "logic",
+	})
+	if err != nil {
+		log.Fatal("Failed to register service:", err)
+	}
+
+	log.Info("Creating LogicHandler and starting network server")
+	handler := &LogicHandler{database: database, redisClient: redisClient}
+	server := network.NewServer(handler)
+
+	go func() {
+		if err := server.Start(listenAddr); err != nil {
+			log.Fatal("Server failed to start:", err)
+		}
+	}()
+	log.Info("Logic server started successfully on ", listenAddr)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	log.Info("Shutting down logic server...")
+	server.Stop()
+	redisClient.Close()
+	database.Close()
+	log.Info("Logic server shutdown complete")
+}

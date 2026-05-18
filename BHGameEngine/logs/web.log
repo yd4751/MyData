@@ -1,0 +1,2 @@
+time="2026-05-17T09:13:32Z" level=info msg="Service registered: webserver :7062"
+2026/05/17 09:47:59 TCP read error: read tcp 127.0.0.1:41886->127.0.0.1:7060: use of closed network connection
