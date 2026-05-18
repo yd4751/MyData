@@ -9,26 +9,33 @@ import (
 	"github.com/openworld-server/internal/player"
 	"github.com/openworld-server/internal/skill"
 	"github.com/openworld-server/internal/worldmap"
+	"github.com/openworld-server/pkg/snowflake"
+)
+
+type BattleState int32
+
+const (
+	BattleStateActive BattleState = 1
+	BattleStateEnded  BattleState = 2
 )
 
 type Battle struct {
-	ID        int64
-	Players   map[int64]*player.Player
-	Monsters  map[int64]*entity.Monster
-	StartTime int64
-	EndTime   int64
-	Active    bool
-	mu        sync.RWMutex
+	ID          int64
+	Players     map[int64]*player.Player
+	Monsters    map[int64]*entity.Monster
+	StartTime   int64
+	EndTime     int64
+	State       BattleState
+	CombatLogs  []*CombatLog
+	ComboTracks map[int64]*ComboTracker
+	mu          sync.RWMutex
 }
 
-type Skill struct {
-	ID       int32
-	Name     string
-	Damage   int32
-	Range    float64
-	CastTime float64
-	Cooldown float64
-	LastCast int64
+type ComboTracker struct {
+	SkillSequence []int64
+	CurrentIndex  int
+	LastCastTime  int64
+	MaxDelay      int
 }
 
 type SkillCombatLog struct {
@@ -39,14 +46,17 @@ type SkillCombatLog struct {
 	Damage    int32
 	Heal      int32
 	IsCombo   bool
+	Effect    string
 }
 
 type CombatLog struct {
 	Timestamp int64
 	Attacker  int64
 	Target    int64
-	SkillID   int32
+	SkillID   int64
 	Damage    int32
+	Heal      int32
+	Effect    string
 }
 
 type BattleManager struct {
@@ -54,19 +64,27 @@ type BattleManager struct {
 	mu      sync.RWMutex
 }
 
-func NewBattleManager() *BattleManager {
-	return &BattleManager{
-		battles: make(map[int64]*Battle),
-	}
+var battleManagerInstance *BattleManager
+var battleOnce sync.Once
+
+func GetBattleManager() *BattleManager {
+	battleOnce.Do(func() {
+		battleManagerInstance = &BattleManager{
+			battles: make(map[int64]*Battle),
+		}
+	})
+	return battleManagerInstance
 }
 
 func (m *BattleManager) CreateBattle(battleID int64) *Battle {
 	battle := &Battle{
-		ID:        battleID,
-		Players:   make(map[int64]*player.Player),
-		Monsters:  make(map[int64]*entity.Monster),
-		StartTime: time.Now().Unix(),
-		Active:    true,
+		ID:          battleID,
+		Players:     make(map[int64]*player.Player),
+		Monsters:    make(map[int64]*entity.Monster),
+		StartTime:   time.Now().Unix(),
+		State:       BattleStateActive,
+		CombatLogs:  make([]*CombatLog, 0),
+		ComboTracks: make(map[int64]*ComboTracker),
 	}
 
 	m.mu.Lock()
@@ -88,7 +106,7 @@ func (m *BattleManager) EndBattle(battleID int64) {
 	battle, ok := m.battles[battleID]
 	if ok {
 		battle.mu.Lock()
-		battle.Active = false
+		battle.State = BattleStateEnded
 		battle.EndTime = time.Now().Unix()
 		battle.mu.Unlock()
 		delete(m.battles, battleID)
@@ -99,14 +117,20 @@ func (m *BattleManager) EndBattle(battleID int64) {
 func (b *Battle) AddPlayer(p *player.Player) {
 	b.mu.Lock()
 	b.Players[p.ID] = p
+	b.ComboTracks[p.ID] = &ComboTracker{
+		SkillSequence: make([]int64, 0),
+		CurrentIndex:  0,
+		MaxDelay:      3000,
+	}
 	b.mu.Unlock()
 }
 
 func (b *Battle) RemovePlayer(playerID int64) {
 	b.mu.Lock()
 	delete(b.Players, playerID)
+	delete(b.ComboTracks, playerID)
 	if len(b.Players) == 0 && len(b.Monsters) == 0 {
-		b.Active = false
+		b.State = BattleStateEnded
 	}
 	b.mu.Unlock()
 }
@@ -121,7 +145,7 @@ func (b *Battle) RemoveMonster(monsterID int64) {
 	b.mu.Lock()
 	delete(b.Monsters, monsterID)
 	if len(b.Players) == 0 && len(b.Monsters) == 0 {
-		b.Active = false
+		b.State = BattleStateEnded
 	}
 	b.mu.Unlock()
 }
@@ -129,80 +153,450 @@ func (b *Battle) RemoveMonster(monsterID int64) {
 func (b *Battle) IsActive() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return b.Active
+	return b.State == BattleStateActive
 }
 
-func CalculateDamage(attacker *player.Player, target *entity.Monster, skill *Skill) int32 {
-	baseDamage := skill.Damage
-	levelBonus := int32(attacker.GetLevel()) * 2
-	weaponBonus := int32(10)
-	total := baseDamage + levelBonus + weaponBonus
+func (b *Battle) GetPlayer(playerID int64) (*player.Player, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	p, ok := b.Players[playerID]
+	return p, ok
+}
 
-	armor := int32(target.Level * 5)
-	damage := total - armor/2
-	if damage < 1 {
-		damage = 1
+func (b *Battle) GetMonster(monsterID int64) (*entity.Monster, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	m, ok := b.Monsters[monsterID]
+	return m, ok
+}
+
+func (b *Battle) AddCombatLog(log *CombatLog) {
+	b.mu.Lock()
+	b.CombatLogs = append(b.CombatLogs, log)
+	if len(b.CombatLogs) > 100 {
+		b.CombatLogs = b.CombatLogs[len(b.CombatLogs)-100:]
+	}
+	b.mu.Unlock()
+}
+
+func CalculateDamage(attacker *player.Player, target *entity.Monster, skillConfig *skill.SkillConfig, skillLevel int) int32 {
+	baseDamage := float32(0)
+	for _, effect := range skillConfig.Effects {
+		if effect.EffectType == skill.EffectTypeDamage {
+			baseDamage += effect.Value
+		}
 	}
 
-	return damage
+	levelBonus := float32(attacker.GetLevel()) * 2
+	baseDamage += levelBonus
+
+	var attributeBonus float32
+	if skillConfig.SkillClass == skill.SkillClassPhysical {
+		attributeBonus = float32(attacker.Strength) * 0.5
+	} else if skillConfig.SkillClass == skill.SkillClassMagic {
+		attributeBonus = float32(attacker.Intelligence) * 0.5
+	}
+	baseDamage += attributeBonus
+
+	levelMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	totalDamage := baseDamage * levelMultiplier
+
+	armor := float32(target.Level * 5)
+	armorReduction := armor / (armor + 100)
+	finalDamage := totalDamage * (1 - armorReduction)
+
+	if finalDamage < 1 {
+		finalDamage = 1
+	}
+
+	return int32(finalDamage)
 }
 
-func CalculateHeal(player *player.Player, amount int32) int32 {
-	player.Heal(amount)
-	return amount
+func CalculatePlayerDamage(attacker *player.Player, target *player.Player, skillConfig *skill.SkillConfig, skillLevel int) int32 {
+	baseDamage := float32(0)
+	for _, effect := range skillConfig.Effects {
+		if effect.EffectType == skill.EffectTypeDamage {
+			baseDamage += effect.Value
+		}
+	}
+
+	levelBonus := float32(attacker.GetLevel()) * 2
+	baseDamage += levelBonus
+
+	var attributeBonus float32
+	if skillConfig.SkillClass == skill.SkillClassPhysical {
+		attributeBonus = float32(attacker.Strength) * 0.5
+	} else if skillConfig.SkillClass == skill.SkillClassMagic {
+		attributeBonus = float32(attacker.Intelligence) * 0.5
+	}
+	baseDamage += attributeBonus
+
+	levelMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	totalDamage := baseDamage * levelMultiplier
+
+	armor := float32(target.Defense)
+	armorReduction := armor / (armor + 100)
+	finalDamage := totalDamage * (1 - armorReduction)
+
+	if finalDamage < 1 {
+		finalDamage = 1
+	}
+
+	return int32(finalDamage)
 }
 
-func IsInRange(pos1, pos2 worldmap.Vec3, r float64) bool {
+func CalculateHeal(caster *player.Player, target *player.Player, skillConfig *skill.SkillConfig, skillLevel int) int32 {
+	baseHeal := float32(0)
+	for _, effect := range skillConfig.Effects {
+		if effect.EffectType == skill.EffectTypeHeal {
+			baseHeal += effect.Value
+		}
+	}
+
+	intellectBonus := float32(caster.Intelligence) * 0.3
+	baseHeal += intellectBonus
+
+	levelMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	totalHeal := baseHeal * levelMultiplier
+
+	return int32(totalHeal)
+}
+
+func IsInRange(pos1, pos2 worldmap.Vec3, r float32) bool {
 	dx := pos1.X - pos2.X
 	dy := pos1.Y - pos2.Y
 	dz := pos1.Z - pos2.Z
-	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+	dist := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 	return dist <= r
 }
 
-func CheckCooldown(skill *Skill) bool {
-	now := time.Now().UnixNano() / 1e6
-	return now-skill.LastCast >= int64(skill.Cooldown*1000)
-}
-
-func ApplyBuff(target *player.Player, buff *player.Buff) {
-	target.ApplyBuff(buff)
-}
-
-func RemoveBuff(target *player.Player, buffID int32) {
-	target.RemoveBuff(buffID)
-}
-
-func UpdateBuffs(target *player.Player) {
-	target.UpdateBuffs()
-}
-
-func ProcessSkill(attacker *player.Player, target *entity.Monster, skill *Skill) *CombatLog {
-	if !IsInRange(attacker.GetPosition(), target.GetPosition(), skill.Range) {
-		return nil
+func (b *Battle) CastSkill(caster *player.Player, skillID int64, targetID int64) (*SkillCombatLog, error) {
+	skillConfig, ok := skill.GetSkillConfig(skillID)
+	if !ok {
+		return nil, skill.ErrSkillNotFound
 	}
 
-	if !CheckCooldown(skill) {
-		return nil
+	playerSkill, ok := skill.GetSkillManager().GetPlayerSkill(caster.ID, skillID)
+	if !ok {
+		return nil, skill.ErrSkillNotLearned
 	}
 
-	damage := CalculateDamage(attacker, target, skill)
-	target.TakeDamage(damage)
-	skill.LastCast = time.Now().UnixNano() / 1e6
+	if skillConfig.SkillType == skill.SkillTypePassive {
+		return nil, skill.ErrCannotCastPassive
+	}
 
-	log := &CombatLog{
+	if !skill.GetSkillManager().CheckCooldown(caster.ID, skillID) {
+		return nil, skill.ErrSkillOnCooldown
+	}
+
+	if !caster.ConsumeMana(int32(skillConfig.ManaCost)) {
+		return nil, skill.ErrInsufficientMana
+	}
+
+	skill.GetSkillManager().SetCooldown(caster.ID, skillID, skillConfig.Cooldown)
+
+	var target *entity.Monster
+	var targetPlayer *player.Player
+	var isPlayerTarget bool
+
+	b.mu.RLock()
+	target, monsterOk := b.Monsters[targetID]
+	if !monsterOk {
+		targetPlayer, isPlayerTarget = b.Players[targetID]
+	}
+	b.mu.RUnlock()
+
+	if target == nil && targetPlayer == nil {
+		return nil, skill.ErrInvalidTarget
+	}
+
+	var targetPos worldmap.Vec3
+	if isPlayerTarget {
+		targetPos = targetPlayer.GetPosition()
+	} else {
+		targetPos = target.GetPosition()
+	}
+
+	if skillConfig.Range > 0 && !IsInRange(caster.GetPosition(), targetPos, skillConfig.Range) {
+		return nil, skill.ErrTargetOutOfRange
+	}
+
+	return b.ExecuteSkill(caster, skillConfig, playerSkill.Level, targetID, isPlayerTarget)
+}
+
+func (b *Battle) ExecuteSkill(caster *player.Player, skillConfig *skill.SkillConfig, skillLevel int, targetID int64, isPlayerTarget bool) (*SkillCombatLog, error) {
+	log := &SkillCombatLog{
 		Timestamp: time.Now().Unix(),
-		Attacker:  attacker.ID,
-		Target:    target.ID,
-		SkillID:   skill.ID,
-		Damage:    damage,
+		Attacker:  caster.ID,
+		Target:    targetID,
+		SkillID:   skillConfig.SkillID,
 	}
 
-	return log
+	for _, effectConfig := range skillConfig.Effects {
+		switch effectConfig.EffectType {
+		case skill.EffectTypeDamage:
+			if isPlayerTarget {
+				b.mu.RLock()
+				target, ok := b.Players[targetID]
+				b.mu.RUnlock()
+				if ok {
+					damage := CalculatePlayerDamage(caster, target, skillConfig, skillLevel)
+					target.TakeDamage(damage)
+					log.Damage += damage
+				}
+			} else {
+				b.mu.RLock()
+				target, ok := b.Monsters[targetID]
+				b.mu.RUnlock()
+				if ok {
+					damage := CalculateDamage(caster, target, skillConfig, skillLevel)
+					target.TakeDamage(damage)
+					log.Damage += damage
+				}
+			}
+
+		case skill.EffectTypeHeal:
+			b.mu.RLock()
+			target, ok := b.Players[targetID]
+			b.mu.RUnlock()
+			if ok {
+				heal := CalculateHeal(caster, target, skillConfig, skillLevel)
+				target.Heal(heal)
+				log.Heal += heal
+			}
+
+		case skill.EffectTypeBuff:
+			b.mu.RLock()
+			target, ok := b.Players[targetID]
+			b.mu.RUnlock()
+			if ok {
+				buff := &player.Buff{
+					ID:      int32(effectConfig.EffectID),
+					Name:    skillConfig.SkillName,
+					Stacks:  1,
+					EndTime: time.Now().UnixNano()/1e6 + int64(effectConfig.Duration),
+				}
+				target.ApplyBuff(buff)
+			}
+
+		case skill.EffectTypeDebuff:
+			if isPlayerTarget {
+				b.mu.RLock()
+				target, ok := b.Players[targetID]
+				b.mu.RUnlock()
+				if ok {
+					buff := &player.Buff{
+						ID:      int32(effectConfig.EffectID),
+						Name:    skillConfig.SkillName,
+						Stacks:  1,
+						EndTime: time.Now().UnixNano()/1e6 + int64(effectConfig.Duration),
+					}
+					target.ApplyBuff(buff)
+				}
+			}
+
+		case skill.EffectTypeDot:
+			b.applyDotEffect(caster.ID, targetID, effectConfig, skillLevel, isPlayerTarget)
+
+		case skill.EffectTypeHot:
+			b.applyHotEffect(targetID, effectConfig, skillLevel)
+
+		case skill.EffectTypeStun:
+			log.Effect = "stun"
+
+		case skill.EffectTypeSilence:
+			log.Effect = "silence"
+
+		case skill.EffectTypeKnockback:
+			log.Effect = "knockback"
+
+		case skill.EffectTypeDamageShield:
+			b.mu.RLock()
+			target, ok := b.Players[targetID]
+			b.mu.RUnlock()
+			if ok {
+				buff := &player.Buff{
+					ID:      int32(effectConfig.EffectID),
+					Name:    "Damage Shield",
+					Stacks:  int32(effectConfig.Value),
+					EndTime: time.Now().UnixNano()/1e6 + int64(effectConfig.Duration),
+				}
+				target.ApplyBuff(buff)
+			}
+		}
+	}
+
+	log.IsCombo = b.CheckCombo(caster.ID, skillConfig.SkillID)
+
+	combatLog := &CombatLog{
+		Timestamp: log.Timestamp,
+		Attacker:  log.Attacker,
+		Target:    log.Target,
+		SkillID:   log.SkillID,
+		Damage:    log.Damage,
+		Heal:      log.Heal,
+	}
+	b.AddCombatLog(combatLog)
+
+	return log, nil
+}
+
+func (b *Battle) applyDotEffect(casterID int64, targetID int64, effectConfig *skill.EffectConfig, skillLevel int, isPlayerTarget bool) {
+	effectMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	tickValue := effectConfig.Value * effectMultiplier
+	tickCount := effectConfig.Duration / effectConfig.TickInterval
+
+	taskID := snowflake.GenerateID()
+	tick := 0
+
+	timer := skill.GetSkillManager().TimerManager()
+	timer.AddTask(taskID, 0, time.Duration(effectConfig.TickInterval)*time.Millisecond, func() {
+		tick++
+		b.mu.RLock()
+		var target *entity.Monster
+		var targetPlayer *player.Player
+		if isPlayerTarget {
+			targetPlayer, _ = b.Players[targetID]
+		} else {
+			target, _ = b.Monsters[targetID]
+		}
+		b.mu.RUnlock()
+
+		if isPlayerTarget && targetPlayer != nil {
+			targetPlayer.TakeDamage(int32(tickValue))
+			log := &CombatLog{
+				Timestamp: time.Now().Unix(),
+				Attacker:  casterID,
+				Target:    targetID,
+				SkillID:   effectConfig.EffectID,
+				Damage:    int32(tickValue),
+				Effect:    "DoT",
+			}
+			b.AddCombatLog(log)
+		} else if !isPlayerTarget && target != nil {
+			target.TakeDamage(int32(tickValue))
+			log := &CombatLog{
+				Timestamp: time.Now().Unix(),
+				Attacker:  casterID,
+				Target:    targetID,
+				SkillID:   effectConfig.EffectID,
+				Damage:    int32(tickValue),
+				Effect:    "DoT",
+			}
+			b.AddCombatLog(log)
+		}
+
+		if tick >= tickCount {
+			timer.RemoveTask(taskID)
+		}
+	})
+}
+
+func (b *Battle) applyHotEffect(targetID int64, effectConfig *skill.EffectConfig, skillLevel int) {
+	effectMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
+	tickValue := effectConfig.Value * effectMultiplier
+
+	taskID := snowflake.GenerateID()
+	timer := skill.GetSkillManager().TimerManager()
+
+	timer.AddTask(taskID, 0, time.Duration(effectConfig.TickInterval)*time.Millisecond, func() {
+		b.mu.RLock()
+		target, ok := b.Players[targetID]
+		b.mu.RUnlock()
+
+		if ok {
+			target.Heal(int32(tickValue))
+			log := &CombatLog{
+				Timestamp: time.Now().Unix(),
+				Attacker:  0,
+				Target:    targetID,
+				SkillID:   effectConfig.EffectID,
+				Heal:      int32(tickValue),
+				Effect:    "HoT",
+			}
+			b.AddCombatLog(log)
+		}
+	})
+}
+
+func (b *Battle) CheckCombo(playerID int64, skillID int64) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	tracker, ok := b.ComboTracks[playerID]
+	if !ok {
+		return false
+	}
+
+	now := time.Now().UnixNano() / 1e6
+	if now-tracker.LastCastTime > int64(tracker.MaxDelay) {
+		tracker.CurrentIndex = 0
+		tracker.SkillSequence = make([]int64, 0)
+	}
+
+	tracker.SkillSequence = append(tracker.SkillSequence, skillID)
+	tracker.LastCastTime = now
+
+	if len(tracker.SkillSequence) >= 3 {
+		tracker.SkillSequence = tracker.SkillSequence[len(tracker.SkillSequence)-3:]
+	}
+
+	if len(tracker.SkillSequence) >= 3 {
+		tracker.CurrentIndex = 0
+		tracker.SkillSequence = make([]int64, 0)
+		return true
+	}
+
+	return false
+}
+
+func (b *Battle) UpdateBuffs() {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for _, p := range b.Players {
+		p.CleanExpiredBuffs()
+	}
+}
+
+func (b *Battle) CheckBattleEnd() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	allMonstersDead := true
+	for _, m := range b.Monsters {
+		if m.GetState() != entity.EntityStateDead {
+			allMonstersDead = false
+			break
+		}
+	}
+
+	allPlayersDead := true
+	for _, p := range b.Players {
+		if p.GetState() != player.StateDead {
+			allPlayersDead = false
+			break
+		}
+	}
+
+	return allMonstersDead || allPlayersDead
+}
+
+func (b *Battle) GetRewards() map[int64]int64 {
+	rewards := make(map[int64]int64)
+	b.mu.RLock()
+	for _, m := range b.Monsters {
+		if m.GetState() == entity.EntityStateDead {
+			for playerID := range b.Players {
+				rewards[playerID] += m.ExpReward
+			}
+		}
+	}
+	b.mu.RUnlock()
+	return rewards
 }
 
 func ProcessMonsterAttack(monster *entity.Monster, player *player.Player) *CombatLog {
-	now := time.Now().Unix()
+	now := time.Now().UnixNano() / 1e6
 	if now-monster.LastAttackTime < 1000 {
 		return nil
 	}
@@ -212,70 +606,20 @@ func ProcessMonsterAttack(monster *entity.Monster, player *player.Player) *Comba
 	}
 
 	damage := int32(monster.Level * 5)
-	player.TakeDamage(damage)
+	armorReduction := float32(player.Defense) / (float32(player.Defense) + 100)
+	finalDamage := int32(float32(damage) * (1 - armorReduction))
+	if finalDamage < 1 {
+		finalDamage = 1
+	}
+
+	player.TakeDamage(finalDamage)
 	monster.LastAttackTime = now
 
-	log := &CombatLog{
-		Timestamp: now,
+	return &CombatLog{
+		Timestamp: now / 1e6,
 		Attacker:  monster.ID,
 		Target:    player.ID,
 		SkillID:   0,
-		Damage:    damage,
+		Damage:    finalDamage,
 	}
-
-	return log
-}
-
-func ProcessSkillWithNewSystem(attacker *player.Player, targetID int64, skillID int64) *SkillCombatLog {
-	result, err := skill.GetSkillManager().CastSkill(attacker, skillID, targetID)
-	if err != nil {
-		return nil
-	}
-
-	log := &SkillCombatLog{
-		Timestamp: time.Now().Unix(),
-		Attacker:  attacker.ID,
-		Target:    targetID,
-		SkillID:   skillID,
-		IsCombo:   result.IsCombo,
-	}
-
-	for _, effect := range result.Effects {
-		switch effect.EffectType {
-		case skill.EffectTypeDamage, skill.EffectTypeDot:
-			log.Damage += int32(effect.Value)
-		case skill.EffectTypeHeal, skill.EffectTypeHot:
-			log.Heal += int32(effect.Value)
-		}
-	}
-
-	return log
-}
-
-func CalculateSkillDamage(attacker *player.Player, skillConfig *skill.SkillConfig, skillLevel int) int32 {
-	baseDamage := float32(0)
-	for _, effect := range skillConfig.Effects {
-		if effect.EffectType == skill.EffectTypeDamage {
-			baseDamage += effect.Value
-		}
-	}
-
-	baseDamage += float32(attacker.GetLevel()) * 2
-	strengthBonus := float32(attacker.Strength) * 0.5
-	intellectBonus := float32(attacker.Intelligence) * 0.5
-
-	if skillConfig.SkillClass == skill.SkillClassPhysical {
-		baseDamage += strengthBonus
-	} else if skillConfig.SkillClass == skill.SkillClassMagic {
-		baseDamage += intellectBonus
-	}
-
-	levelMultiplier := float32(1.0 + float32(skillLevel-1)*0.1)
-	totalDamage := int32(baseDamage * levelMultiplier)
-
-	if totalDamage < 1 {
-		totalDamage = 1
-	}
-
-	return totalDamage
 }
