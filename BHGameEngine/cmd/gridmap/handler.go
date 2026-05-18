@@ -8,6 +8,7 @@ import (
 
 	"github.com/openworld-server/internal/ai"
 	"github.com/openworld-server/internal/cluster"
+	"github.com/openworld-server/internal/connector"
 	"github.com/openworld-server/internal/entity"
 	"github.com/openworld-server/internal/msg"
 	"github.com/openworld-server/internal/network"
@@ -26,6 +27,7 @@ type GridMapHandler struct {
 	mapLoader   *worldmap.MapLoader
 	gridID      int
 	playerConns map[int64]net.Conn
+	connector   *connector.Connector
 	mu          sync.RWMutex
 }
 
@@ -40,6 +42,7 @@ func NewGridMapHandler(cluster *cluster.Cluster, gridID int) *GridMapHandler {
 		mapLoader:   worldmap.NewMapLoader("./data/maps"),
 		gridID:      gridID,
 		playerConns: make(map[int64]net.Conn),
+		connector:   connector.NewConnector(cluster),
 	}
 }
 
@@ -149,7 +152,7 @@ func (h *GridMapHandler) handlePlayerMove(msgObj *network.Message) {
 }
 
 func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap.Vec3) {
-	_, ok := h.playerMgr.GetPlayer(playerID)
+	player, ok := h.playerMgr.GetPlayer(playerID)
 	if !ok {
 		return
 	}
@@ -163,6 +166,8 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 
 	logger.Info("Player ", playerID, " crossing from grid ", oldGridID, " to grid ", newGridID)
 
+	oldPos := player.GetPosition()
+
 	h.worldMap.UpdatePlayerPosition(playerID, worldmap.Vec3{X: -1, Y: -1, Z: 0})
 
 	req := msg.MapCrossGridRequest{
@@ -172,34 +177,50 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 		PosX:       newPos.X,
 		PosY:       newPos.Y,
 		PosZ:       newPos.Z,
+		Name:       player.Name,
+		Level:      player.GetLevel(),
+		Health:     player.Health,
+		MaxHealth:  player.GetMaxHealth(),
+		Rotation:   player.Rotation,
 	}
 
 	service, err := h.gridRouter.GetGridMapByID(newGridID)
 	if err != nil || service == nil {
 		logger.Error("Failed to find target gridmap service: ", err)
+		h.handleCrossGridFailure(playerID, oldPos)
 		return
 	}
 
-	conn, err := net.Dial("tcp", service.Addr)
+	nodeID := "gridmap:" + service.Addr
+	conn, err := h.connector.GetConnectionByNodeID(nodeID)
 	if err != nil {
-		logger.Error("Failed to connect to target gridmap: ", err)
+		logger.Error("Failed to get connection to target gridmap: ", err)
+		h.handleCrossGridFailure(playerID, oldPos)
 		return
 	}
-	defer conn.Close()
 
 	data, _ := json.Marshal(req)
-	network.SendRawMessage(conn, msg.MSG_MAP_CROSS_GRID_REQ, msg.NodeTypeGridMap, data)
-
-	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
+	err = conn.Send(msg.MSG_MAP_CROSS_GRID_REQ, msg.NodeTypeGridMap, data)
 	if err != nil {
-		logger.Error("Failed to read cross grid response: ", err)
+		logger.Error("Failed to send cross grid request: ", err)
+		h.handleCrossGridFailure(playerID, oldPos)
 		return
 	}
 
-	_, _, respData, _ := network.ParseMessage(buf[:n])
+	_, _, respData, err := conn.Receive(5 * time.Second)
+	if err != nil {
+		logger.Error("Failed to read cross grid response: ", err)
+		h.handleCrossGridFailure(playerID, oldPos)
+		return
+	}
+
 	var resp msg.MapCrossGridResponse
-	json.Unmarshal(respData, &resp)
+	err = json.Unmarshal(respData, &resp)
+	if err != nil {
+		logger.Error("Failed to unmarshal cross grid response: ", err)
+		h.handleCrossGridFailure(playerID, oldPos)
+		return
+	}
 
 	if resp.Result == 0 {
 		h.playerMgr.RemovePlayer(playerID)
@@ -207,7 +228,23 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 		delete(h.playerConns, playerID)
 		h.mu.Unlock()
 		logger.Info("Player ", playerID, " successfully transferred to grid ", newGridID)
+	} else {
+		logger.Error("Cross grid failed: ", resp.Message)
+		h.handleCrossGridFailure(playerID, oldPos)
 	}
+}
+
+func (h *GridMapHandler) handleCrossGridFailure(playerID int64, oldPos worldmap.Vec3) {
+	logger.Info("Rolling back player ", playerID, " to position (", oldPos.X, ",", oldPos.Y, ")")
+
+	h.worldMap.UpdatePlayerPosition(playerID, oldPos)
+
+	player, ok := h.playerMgr.GetPlayer(playerID)
+	if ok {
+		player.Pos = oldPos
+	}
+
+	h.syncNearbyPlayers(playerID, oldPos)
 }
 
 func (h *GridMapHandler) handleCrossGrid(msgObj *network.Message) {
@@ -218,8 +255,12 @@ func (h *GridMapHandler) handleCrossGrid(msgObj *network.Message) {
 		return
 	}
 
-	player := h.playerMgr.CreatePlayer(req.PlayerID, "", 0)
+	player := h.playerMgr.CreatePlayer(req.PlayerID, req.Name, 0)
 	player.Pos = worldmap.Vec3{X: req.PosX, Y: req.PosY, Z: req.PosZ}
+	player.Rotation = req.Rotation
+	player.Level = req.Level
+	player.Health = req.Health
+	player.MaxHealth = req.MaxHealth
 
 	h.worldMap.UpdatePlayerPosition(req.PlayerID, player.Pos)
 

@@ -518,6 +518,11 @@ type MapCrossGridRequest struct {
 	PosX       float64 `json:"pos_x"`        // X坐标
 	PosY       float64 `json:"pos_y"`        // Y坐标
 	PosZ       float64 `json:"pos_z"`        // Z坐标
+	Name       string  `json:"name"`         // 玩家名称
+	Level      int32   `json:"level"`        // 等级
+	Health     int32   `json:"health"`       // 当前生命值
+	MaxHealth  int32   `json:"max_health"`   // 最大生命值
+	Rotation   float64 `json:"rotation"`     // 旋转角度
 }
 
 type MapCrossGridResponse struct {
