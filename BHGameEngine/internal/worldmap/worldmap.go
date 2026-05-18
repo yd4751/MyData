@@ -177,6 +177,40 @@ func (w *WorldMap) chunkToWorldPos(chunk ChunkPos) Vec3 {
 	}
 }
 
+func (w *WorldMap) WorldPosToChunk(pos Vec3) ChunkPos {
+	return w.worldPosToChunk(pos)
+}
+
+func (w *WorldMap) GetNearbyPlayers(pos Vec3, radius float64) []*PlayerInChunk {
+	centerChunk := w.worldPosToChunk(pos)
+	players := make([]*PlayerInChunk, 0)
+
+	for dx := -w.viewRange; dx <= w.viewRange; dx++ {
+		for dy := -w.viewRange; dy <= w.viewRange; dy++ {
+			chunkPos := ChunkPos{centerChunk.X + dx, centerChunk.Y + dy}
+			w.mu.RLock()
+			chunk, ok := w.chunks[chunkPos]
+			w.mu.RUnlock()
+
+			if ok {
+				chunk.mu.RLock()
+				for _, player := range chunk.Players {
+					dx := player.Pos.X - pos.X
+					dy := player.Pos.Y - pos.Y
+					dz := player.Pos.Z - pos.Z
+					dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+					if dist <= radius {
+						players = append(players, player)
+					}
+				}
+				chunk.mu.RUnlock()
+			}
+		}
+	}
+
+	return players
+}
+
 func (w *WorldMap) AddEntity(chunkPos ChunkPos, entityID int64, entity interface{}) {
 	chunk := w.GetChunk(chunkPos)
 	chunk.mu.Lock()
