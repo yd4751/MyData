@@ -83,20 +83,23 @@ func (h *GridMapHandler) handlePlayerEnter(msgObj *network.Message) {
 		return
 	}
 
-	player := h.playerMgr.CreatePlayer(req.PlayerID, req.Name, 0)
-	player.Pos = worldmap.Vec3{X: req.PosX, Y: req.PosY, Z: req.PosZ}
-	player.Rotation = req.Rotation
-	player.Level = req.Level
-	player.Health = req.Health
-	player.MaxHealth = req.MaxHealth
+	player := h.playerMgr.CreatePlayer(req.PlayerID, req.Name, req.AccountID)
+	player.SetPosition(worldmap.Vec3{X: req.PosX, Y: req.PosY, Z: req.PosZ})
+	player.SetRotation(req.Rotation)
+	player.SetLevel(req.Level)
+	player.SetHealth(req.Health)
+	player.SetMaxHealth(req.MaxHealth)
 
-	h.worldMap.UpdatePlayerPosition(req.PlayerID, player.Pos)
+	chunkPos := h.worldMap.WorldPosToChunk(player.GetPosition())
+	player.SetChunkPos(chunkPos)
+
+	h.worldMap.UpdatePlayerPosition(req.PlayerID, player.GetPosition())
 
 	h.mu.Lock()
 	h.playerConns[req.PlayerID] = msgObj.Session
 	h.mu.Unlock()
 
-	h.spawnMonstersNearPlayer(req.PlayerID, player.Pos)
+	h.spawnMonstersNearPlayer(req.PlayerID, player.GetPosition())
 
 	logger.Info("Player entered gridmap ", h.gridID, ": ", req.PlayerID, " at (", req.PosX, ",", req.PosY, ")")
 
@@ -155,8 +158,10 @@ func (h *GridMapHandler) actuallySpawnMonsters(playerPos worldmap.Vec3, count in
 		name := monsterNames[rand.Intn(len(monsterNames))]
 		level := int32(1 + rand.Intn(3))
 
-		h.entityMgr.CreateMonster(monsterID, name, monsterPos, level)
-		h.worldMap.AddEntity(h.worldMap.WorldPosToChunk(monsterPos), monsterID, nil)
+		monster := h.entityMgr.CreateMonster(monsterID, name, monsterPos, level)
+		chunkPos := h.worldMap.WorldPosToChunk(monsterPos)
+		monster.ChunkPos = chunkPos
+		h.worldMap.AddEntity(chunkPos, monsterID, monster)
 		h.aiManager.AddBehavior(monsterID, ai.AITypeAggressive, monsterPos)
 
 		logger.Info("Spawned monster ", name, " (ID: ", monsterID, ") at (", monsterPos.X, ",", monsterPos.Y, ")")
@@ -209,13 +214,25 @@ func (h *GridMapHandler) handlePlayerMove(msgObj *network.Message) {
 		return
 	}
 
-	if h.gridRouter.IsCrossingBoundary(player.Pos, newPos) {
-		h.handleCrossGridInternal(req.PlayerID, newPos)
+	if h.gridRouter.IsCrossingBoundary(player.GetPosition(), newPos) {
+		success := h.handleCrossGridInternal(req.PlayerID, newPos, msgObj.Session)
+		resp := msg.MapPlayerMoveResponse{
+			Result:  0,
+			Message: "cross grid success",
+		}
+		if !success {
+			resp.Result = 1
+			resp.Message = "cross grid failed"
+		}
+		h.sendResponse(msgObj.Session, msg.MSG_MAP_PLAYER_MOVE, &resp)
 		return
 	}
 
 	h.playerMgr.UpdatePosition(req.PlayerID, newPos)
 	h.worldMap.UpdatePlayerPosition(req.PlayerID, newPos)
+
+	chunkPos := h.worldMap.WorldPosToChunk(newPos)
+	player.SetChunkPos(chunkPos)
 
 	h.checkMonsterCollision(req.PlayerID, newPos)
 
@@ -307,27 +324,26 @@ func (h *GridMapHandler) notifyBattleStart(playerID int64, battleID int64) {
 	network.SendRawMessage(conn, 4007, msg.NodeTypeGridMap, data)
 }
 
-func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap.Vec3) {
+func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap.Vec3, session net.Conn) bool {
 	player, ok := h.playerMgr.GetPlayer(playerID)
 	if !ok {
-		return
+		return false
 	}
 
 	oldGridID := h.gridID
 	newGridID := h.gridRouter.GetGridMapID(newPos)
 
 	if newGridID == oldGridID {
-		return
+		return true
 	}
 
 	logger.Info("Player ", playerID, " crossing from grid ", oldGridID, " to grid ", newGridID)
 
 	oldPos := player.GetPosition()
 
-	h.worldMap.UpdatePlayerPosition(playerID, worldmap.Vec3{X: -1, Y: -1, Z: 0})
-
 	req := msg.MapCrossGridRequest{
 		PlayerID:   playerID,
+		AccountID:  player.AccountID,
 		FromGridID: oldGridID,
 		ToGridID:   newGridID,
 		PosX:       newPos.X,
@@ -344,7 +360,7 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 	if err != nil || service == nil {
 		logger.Error("Failed to find target gridmap service: ", err)
 		h.handleCrossGridFailure(playerID, oldPos)
-		return
+		return false
 	}
 
 	nodeID := "gridmap:" + service.Addr
@@ -352,7 +368,7 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 	if err != nil {
 		logger.Error("Failed to get connection to target gridmap: ", err)
 		h.handleCrossGridFailure(playerID, oldPos)
-		return
+		return false
 	}
 
 	data, _ := json.Marshal(req)
@@ -360,14 +376,14 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 	if err != nil {
 		logger.Error("Failed to send cross grid request: ", err)
 		h.handleCrossGridFailure(playerID, oldPos)
-		return
+		return false
 	}
 
 	_, _, respData, err := conn.Receive(5 * time.Second)
 	if err != nil {
 		logger.Error("Failed to read cross grid response: ", err)
 		h.handleCrossGridFailure(playerID, oldPos)
-		return
+		return false
 	}
 
 	var resp msg.MapCrossGridResponse
@@ -375,18 +391,21 @@ func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap
 	if err != nil {
 		logger.Error("Failed to unmarshal cross grid response: ", err)
 		h.handleCrossGridFailure(playerID, oldPos)
-		return
+		return false
 	}
 
 	if resp.Result == 0 {
+		h.worldMap.UpdatePlayerPosition(playerID, worldmap.Vec3{X: -1, Y: -1, Z: 0})
 		h.playerMgr.RemovePlayer(playerID)
 		h.mu.Lock()
 		delete(h.playerConns, playerID)
 		h.mu.Unlock()
 		logger.Info("Player ", playerID, " successfully transferred to grid ", newGridID)
+		return true
 	} else {
 		logger.Error("Cross grid failed: ", resp.Message)
 		h.handleCrossGridFailure(playerID, oldPos)
+		return false
 	}
 }
 
@@ -411,14 +430,17 @@ func (h *GridMapHandler) handleCrossGrid(msgObj *network.Message) {
 		return
 	}
 
-	player := h.playerMgr.CreatePlayer(req.PlayerID, req.Name, 0)
-	player.Pos = worldmap.Vec3{X: req.PosX, Y: req.PosY, Z: req.PosZ}
-	player.Rotation = req.Rotation
-	player.Level = req.Level
-	player.Health = req.Health
-	player.MaxHealth = req.MaxHealth
+	player := h.playerMgr.CreatePlayer(req.PlayerID, req.Name, req.AccountID)
+	player.SetPosition(worldmap.Vec3{X: req.PosX, Y: req.PosY, Z: req.PosZ})
+	player.SetRotation(req.Rotation)
+	player.SetLevel(req.Level)
+	player.SetHealth(req.Health)
+	player.SetMaxHealth(req.MaxHealth)
 
-	h.worldMap.UpdatePlayerPosition(req.PlayerID, player.Pos)
+	chunkPos := h.worldMap.WorldPosToChunk(player.GetPosition())
+	player.SetChunkPos(chunkPos)
+
+	h.worldMap.UpdatePlayerPosition(req.PlayerID, player.GetPosition())
 
 	h.mu.Lock()
 	h.playerConns[req.PlayerID] = msgObj.Session
@@ -464,7 +486,8 @@ func (h *GridMapHandler) handleChunkLoad(msgObj *network.Message) {
 				monster = h.entityMgr.CreateMonster(entityData.EntityID, entityData.Name,
 					worldmap.Vec3{X: entityData.Pos.X, Y: entityData.Pos.Y, Z: entityData.Pos.Z},
 					1)
-				h.worldMap.AddEntity(chunkPos, entityData.EntityID, nil)
+				monster.ChunkPos = chunkPos
+				h.worldMap.AddEntity(chunkPos, entityData.EntityID, monster)
 				h.aiManager.AddBehavior(entityData.EntityID, ai.AITypeAggressive, entityData.Pos)
 			}
 			health = monster.Health
@@ -512,10 +535,12 @@ func (h *GridMapHandler) handleEntitySync(msgObj *network.Message) {
 
 	for _, entityInfo := range req.Entities {
 		chunkPos := h.worldMap.WorldPosToChunk(worldmap.Vec3{X: entityInfo.PosX, Y: entityInfo.PosY, Z: entityInfo.PosZ})
-		h.entityMgr.CreateMonster(entityInfo.EntityID, entityInfo.Name,
+		monster := h.entityMgr.CreateMonster(entityInfo.EntityID, entityInfo.Name,
 			worldmap.Vec3{X: entityInfo.PosX, Y: entityInfo.PosY, Z: entityInfo.PosZ},
 			1)
-		h.worldMap.AddEntity(chunkPos, entityInfo.EntityID, nil)
+		monster.ChunkPos = chunkPos
+		h.worldMap.AddEntity(chunkPos, entityInfo.EntityID, monster)
+		h.aiManager.AddBehavior(entityInfo.EntityID, ai.AITypeAggressive, monster.GetPosition())
 	}
 }
 

@@ -452,6 +452,7 @@ type EntityInfo struct {
 
 type MapPlayerEnterRequest struct {
 	PlayerID  int64   `json:"player_id"`  // 玩家ID
+	AccountID int64   `json:"account_id"` // 账号ID
 	Name      string  `json:"name"`       // 玩家名称
 	PosX      float64 `json:"pos_x"`      // X坐标
 	PosY      float64 `json:"pos_y"`      // Y坐标
@@ -513,6 +514,7 @@ type MapEntitySyncRequest struct {
 
 type MapCrossGridRequest struct {
 	PlayerID   int64   `json:"player_id"`    // 玩家ID
+	AccountID  int64   `json:"account_id"`   // 账号ID
 	FromGridID int     `json:"from_grid_id"` // 原网格ID
 	ToGridID   int     `json:"to_grid_id"`   // 目标网格ID
 	PosX       float64 `json:"pos_x"`        // X坐标

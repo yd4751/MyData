@@ -110,6 +110,21 @@ func (w *WorldMap) UpdatePlayerPosition(playerID int64, newPos Vec3) ([]*Chunk, 
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if newPos.X < 0 && newPos.Y < 0 {
+		oldChunk, oldOk := w.playerChunks[playerID]
+		if oldOk {
+			oldView := w.getViewChunks(oldChunk)
+			for _, chunk := range oldView {
+				chunk.mu.Lock()
+				delete(chunk.Players, playerID)
+				chunk.mu.Unlock()
+			}
+			delete(w.playerChunks, playerID)
+			return nil, oldView
+		}
+		return nil, nil
+	}
+
 	oldChunk, oldOk := w.playerChunks[playerID]
 	newChunk := w.worldPosToChunk(newPos)
 

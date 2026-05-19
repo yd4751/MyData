@@ -448,7 +448,7 @@ func (m *SkillManager) ExecuteSkill(casterID int64, config *SkillConfig, level i
 	for _, effectConfig := range config.Effects {
 		effectResult := m.ApplyEffect(effectConfig, effectMultiplier)
 		result.Effects = append(result.Effects, effectResult)
-		m.ApplyEffectToTarget(targetID, effectResult, effectConfig, effectMultiplier)
+		m.ApplyEffectToTarget(casterID, targetID, effectResult, effectConfig, effectMultiplier)
 	}
 
 	m.CheckCombo(casterID, config.SkillID, result)
@@ -465,17 +465,59 @@ func (m *SkillManager) ApplyEffect(config *EffectConfig, multiplier float32) *Ef
 	}
 }
 
-func (m *SkillManager) ApplyEffectToTarget(targetID int64, effect *EffectResult, config *EffectConfig, multiplier float32) {
+func (m *SkillManager) ApplyEffectToTarget(casterID int64, targetID int64, effect *EffectResult, config *EffectConfig, multiplier float32) {
 	switch effect.EffectType {
 	case EffectTypeDamage:
 		targetEntity := GetTargetEntity(targetID)
 		if targetEntity != nil {
-			targetEntity.TakeDamage(int32(effect.Value))
+			damage := int32(effect.Value)
+			defense := targetEntity.GetDefense()
+			armorReduction := float32(defense) / (float32(defense) + 100)
+			finalDamage := int32(float32(damage) * (1 - armorReduction))
+			if finalDamage < 1 {
+				finalDamage = 1
+			}
+			targetEntity.TakeDamage(finalDamage)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, finalDamage)
 		}
 	case EffectTypeHeal:
 		targetEntity := GetTargetEntity(targetID)
 		if targetEntity != nil {
-			targetEntity.Heal(int32(effect.Value))
+			healAmount := int32(effect.Value)
+			targetEntity.Heal(healAmount)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, healAmount)
+		}
+	case EffectTypeBuff:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value * multiplier,
+				Duration:   config.Duration,
+				StackCount: 1,
+				MaxStacks:  config.StackCount,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   false,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(config.Value))
+		}
+	case EffectTypeDebuff:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value * multiplier,
+				Duration:   config.Duration,
+				StackCount: 1,
+				MaxStacks:  config.StackCount,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   true,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(config.Value))
 		}
 	case EffectTypeDot:
 		tickValue := config.Value * multiplier
@@ -487,8 +529,15 @@ func (m *SkillManager) ApplyEffectToTarget(targetID int64, effect *EffectResult,
 		m.timerManager.AddTask(taskID, 0, time.Duration(config.TickInterval)*time.Millisecond, func() {
 			tick++
 			targetEntity := GetTargetEntity(targetID)
-			if targetEntity != nil {
-				targetEntity.TakeDamage(int32(tickValue))
+			if targetEntity != nil && !targetEntity.IsDead() {
+				defense := targetEntity.GetDefense()
+				armorReduction := float32(defense) / (float32(defense) + 100)
+				finalDamage := int32(float32(tickValue) * (1 - armorReduction))
+				if finalDamage < 1 {
+					finalDamage = 1
+				}
+				targetEntity.TakeDamage(finalDamage)
+				TriggerSkillEffect(casterID, targetID, effect.EffectType, finalDamage)
 			}
 			if tick >= tickCount {
 				m.timerManager.RemoveTask(taskID)
@@ -496,14 +545,102 @@ func (m *SkillManager) ApplyEffectToTarget(targetID int64, effect *EffectResult,
 		})
 	case EffectTypeHot:
 		tickValue := config.Value * multiplier
+		tickCount := config.Duration / config.TickInterval
 
 		taskID := snowflake.GenerateID()
+		tick := 0
+
 		m.timerManager.AddTask(taskID, 0, time.Duration(config.TickInterval)*time.Millisecond, func() {
+			tick++
 			targetEntity := GetTargetEntity(targetID)
-			if targetEntity != nil {
+			if targetEntity != nil && !targetEntity.IsDead() {
 				targetEntity.Heal(int32(tickValue))
+				TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(tickValue))
+			}
+			if tick >= tickCount {
+				m.timerManager.RemoveTask(taskID)
 			}
 		})
+	case EffectTypeStun:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value,
+				Duration:   config.Duration,
+				StackCount: 1,
+				MaxStacks:  1,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   true,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, 0)
+		}
+	case EffectTypeSilence:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value,
+				Duration:   config.Duration,
+				StackCount: 1,
+				MaxStacks:  1,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   true,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, 0)
+		}
+	case EffectTypeKnockback:
+		TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(config.Value))
+	case EffectTypeSpeedBuff:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value * multiplier,
+				Duration:   config.Duration,
+				StackCount: 1,
+				MaxStacks:  config.StackCount,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   false,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(config.Value))
+		}
+	case EffectTypeDamageShield:
+		targetEntity := GetTargetEntity(targetID)
+		if targetEntity != nil {
+			buff := &BuffEffect{
+				EffectID:   config.EffectID,
+				EffectType: config.EffectType,
+				Value:      config.Value * multiplier,
+				Duration:   config.Duration,
+				StackCount: int(config.Value * multiplier),
+				MaxStacks:  1,
+				StartTime:  time.Now().UnixNano() / 1e6,
+				IsDebuff:   false,
+			}
+			targetEntity.AddBuffEffect(buff)
+			TriggerSkillEffect(casterID, targetID, effect.EffectType, int32(config.Value))
+		}
+	}
+}
+
+var effectTrigger func(casterID, targetID int64, effectType EffectType, value int32)
+
+// SetEffectTrigger 设置技能效果触发回调（用于客户端显示特效）
+func SetEffectTrigger(trigger func(casterID, targetID int64, effectType EffectType, value int32)) {
+	effectTrigger = trigger
+}
+
+// TriggerSkillEffect 触发技能效果展示
+func TriggerSkillEffect(casterID, targetID int64, effectType EffectType, value int32) {
+	if effectTrigger != nil {
+		effectTrigger(casterID, targetID, effectType, value)
 	}
 }
 
@@ -567,8 +704,27 @@ func GetTargetEntity(targetID int64) EntityTarget {
 	return nil
 }
 
+// BuffEffect 增益/减益效果
+type BuffEffect struct {
+	EffectID   int64      // 效果ID
+	EffectType EffectType // 效果类型
+	Value      float32    // 效果数值
+	Duration   int        // 持续时间(毫秒)
+	StackCount int        // 当前堆叠层数
+	MaxStacks  int        // 最大堆叠层数
+	StartTime  int64      // 开始时间
+	IsDebuff   bool       // 是否为减益效果
+}
+
 // EntityTarget 技能目标实体接口
 type EntityTarget interface {
-	TakeDamage(damage int32) // 受到伤害
-	Heal(amount int32)       // 恢复生命值
+	TakeDamage(damage int32)                // 受到伤害
+	Heal(amount int32)                      // 恢复生命值
+	GetDefense() int32                      // 获取防御值
+	GetMaxHealth() int32                    // 获取最大生命值
+	IsDead() bool                           // 是否死亡
+	AddBuffEffect(buff *BuffEffect)         // 添加增益效果
+	RemoveBuffEffect(effectID int64)        // 移除增益效果
+	HasBuffEffect(effectID int64) bool      // 是否有增益效果
+	GetBuffEffectStacks(effectID int64) int // 获取增益堆叠层数
 }

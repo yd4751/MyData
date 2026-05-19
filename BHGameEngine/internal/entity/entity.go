@@ -26,6 +26,18 @@ const (
 	EntityStateSleeping  EntityState = 4 // 休眠
 )
 
+// BuffEffect 增益/减益效果
+type BuffEffect struct {
+	EffectID   int64
+	EffectType int32
+	Value      float32
+	Duration   int
+	StackCount int
+	MaxStacks  int
+	StartTime  int64
+	IsDebuff   bool
+}
+
 // Entity 实体基类
 type Entity struct {
 	ID           int64             // 实体ID
@@ -42,6 +54,7 @@ type Entity struct {
 	DespawnTime  int64             // 消失时间
 	AIEnabled    bool              // 是否启用AI
 	InterestList map[int64]bool    // 关注此实体的玩家列表
+	BuffEffects  []*BuffEffect     // 增益/减益效果列表
 	mu           sync.RWMutex      // 并发锁
 }
 
@@ -106,6 +119,7 @@ func (m *EntityManager) CreateMonster(id int64, name string, pos worldmap.Vec3, 
 			State:        EntityStateIdle,
 			AIEnabled:    true,
 			InterestList: make(map[int64]bool),
+			BuffEffects:  make([]*BuffEffect, 0),
 		},
 		Level:        level,
 		ExpReward:    int64(level * 10),
@@ -324,6 +338,81 @@ func (e *Entity) TakeDamage(damage int32) {
 		e.State = EntityStateDead
 	}
 	e.mu.Unlock()
+}
+
+func (e *Entity) Heal(amount int32) {
+	e.mu.Lock()
+	e.Health += amount
+	if e.Health > e.MaxHealth {
+		e.Health = e.MaxHealth
+	}
+	e.mu.Unlock()
+}
+
+func (e *Entity) GetDefense() int32 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return int32(0)
+}
+
+func (e *Entity) IsDead() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.State == EntityStateDead
+}
+
+func (e *Entity) AddBuffEffect(buff *BuffEffect) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for _, existing := range e.BuffEffects {
+		if existing.EffectID == buff.EffectID {
+			if existing.StackCount < existing.MaxStacks {
+				existing.StackCount++
+			}
+			existing.StartTime = buff.StartTime
+			existing.Duration = buff.Duration
+			return
+		}
+	}
+
+	e.BuffEffects = append(e.BuffEffects, buff)
+}
+
+func (e *Entity) RemoveBuffEffect(effectID int64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for i, buff := range e.BuffEffects {
+		if buff.EffectID == effectID {
+			e.BuffEffects = append(e.BuffEffects[:i], e.BuffEffects[i+1:]...)
+			break
+		}
+	}
+}
+
+func (e *Entity) HasBuffEffect(effectID int64) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	for _, buff := range e.BuffEffects {
+		if buff.EffectID == effectID {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Entity) GetBuffEffectStacks(effectID int64) int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	for _, buff := range e.BuffEffects {
+		if buff.EffectID == effectID {
+			return buff.StackCount
+		}
+	}
+	return 0
 }
 
 func (e *Entity) IsSleeping() bool {
