@@ -17,6 +17,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/openworld-server/internal/cluster"
+	"github.com/openworld-server/internal/worldmap"
 	"github.com/openworld-server/pkg/config"
 	"github.com/openworld-server/pkg/logger"
 )
@@ -42,6 +43,8 @@ var (
 	logEntries     []LogEntry
 	logEntriesMu   sync.Mutex
 	logBroadcaster = make(chan LogEntry, 100)
+
+	mapLoader *worldmap.MapLoader
 )
 
 func getGateAddrFromEtcd() (string, error) {
@@ -264,6 +267,102 @@ func getServicesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(services)
 }
 
+func mapChunkHandler(w http.ResponseWriter, r *http.Request) {
+	x := parseIntParam(r.URL.Query().Get("x"), 0)
+	y := parseIntParam(r.URL.Query().Get("y"), 0)
+
+	chunkPos := worldmap.ChunkPos{X: x, Y: y}
+	chunkData, err := mapLoader.LoadChunk(chunkPos)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"x":        x,
+		"y":        y,
+		"tiles":    chunkData.Tiles,
+		"entities": chunkData.Entities,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func mapGenerateHandler(w http.ResponseWriter, r *http.Request) {
+	x := parseIntParam(r.URL.Query().Get("x"), 0)
+	y := parseIntParam(r.URL.Query().Get("y"), 0)
+
+	chunkPos := worldmap.ChunkPos{X: x, Y: y}
+	chunkData := mapLoader.GenerateDefaultChunk(chunkPos)
+	err := mapLoader.SaveChunk(chunkData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"x":       x,
+		"y":       y,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func mapSaveHandler(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		X        int                                                      `json:"x"`
+		Y        int                                                      `json:"y"`
+		Tiles    [worldmap.ChunkSize][worldmap.ChunkSize]worldmap.MapTile `json:"tiles"`
+		Entities []worldmap.MapEntityData                                 `json:"entities"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	chunkData := &worldmap.MapChunkData{
+		ChunkPos: worldmap.ChunkPos{X: request.X, Y: request.Y},
+		Tiles:    request.Tiles,
+		Entities: request.Entities,
+		Version:  1,
+	}
+
+	err := mapLoader.SaveChunk(chunkData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Chunk saved successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func parseIntParam(s string, defaultValue int) int {
+	if s == "" {
+		return defaultValue
+	}
+	result := 0
+	for _, c := range s {
+		if c >= '0' && c <= '9' {
+			result = result*10 + int(c-'0')
+		} else if c == '-' && result == 0 {
+			continue
+		} else {
+			return defaultValue
+		}
+	}
+	return result
+}
+
 func main() {
 	flag.Parse()
 
@@ -278,6 +377,9 @@ func main() {
 
 	listenAddr := config.GetWebServerListenAddr()
 
+	mapLoader = worldmap.NewMapLoader("./data/maps")
+	os.MkdirAll("./data/maps", 0755)
+
 	http.Handle("/", http.FileServer(http.Dir("./web")))
 	http.Handle("/admin/", http.StripPrefix("/admin/", http.FileServer(http.Dir("./web"))))
 	http.HandleFunc("/ws", wsHandler)
@@ -285,6 +387,9 @@ func main() {
 	http.HandleFunc("/log", logHandler)
 	http.HandleFunc("/api/logs/stream", logStreamHandler)
 	http.HandleFunc("/api/services", getServicesHandler)
+	http.HandleFunc("/api/map/chunk", mapChunkHandler)
+	http.HandleFunc("/api/map/generate", mapGenerateHandler)
+	http.HandleFunc("/api/map/save", mapSaveHandler)
 
 	go func() {
 		if err := http.ListenAndServe(listenAddr, nil); err != nil {

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无缝地图 - BHGameEngine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #fff; }
+        
+        .header { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            height: 50px; 
+            background: rgba(22, 33, 62, 0.95); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+            border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+        }
+        
+        .header h1 { 
+            font-size: 18px; 
+            color: #00d9ff; 
+            font-weight: 600;
+        }
+        
+        .header .controls { 
+            display: flex; 
+            gap: 15px; 
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover { background: rgba(0, 217, 255, 0.3); }
+        .btn.active { background: #00d9ff; color: #1a1a2e; }
+        
+        .info-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(15, 52, 96, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 100;
+            min-width: 220px;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+        
+        .info-panel h3 {
+            color: #00d9ff;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .info-label { color: #aaa; }
+        .info-value { color: #00d9ff; font-family: monospace; }
+        
+        .chunk-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+            margin-top: 10px;
+        }
+        
+        .chunk-cell {
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-family: monospace;
+            transition: all 0.2s;
+        }
+        
+        .chunk-cell.center {
+            background: #00d9ff;
+            color: #1a1a2e;
+            box-shadow: 0 0 8px #00d9ff;
+        }
+        
+        .chunk-cell.loaded {
+            background: rgba(34, 197, 94, 0.4);
+            border: 1px solid rgba(34, 197, 94, 0.6);
+            color: #22c55e;
+        }
+        
+        .chunk-cell.loading {
+            background: rgba(245, 158, 11, 0.4);
+            border: 1px solid rgba(245, 158, 11, 0.6);
+            color: #f59e0b;
+        }
+        
+        .chunk-cell.unloaded {
+            background: rgba(139, 90, 43, 0.2);
+            border: 1px dashed rgba(139, 90, 43, 0.4);
+            color: #8b5a2b;
+        }
+        
+        .canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #mapCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #0d0d14;
+        }
+        
+        .debug-toggle {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            z-index: 100;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(15, 52, 96, 0.95);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            z-index: 100;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        
+        .movement-hint {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            background: rgba(15, 52, 96, 0.95);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #aaa;
+            z-index: 100;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ BHGameEngine 无缝地图</h1>
+        <div class="controls">
+            <button class="btn" onclick="toggleDebug()">调试模式</button>
+            <button class="btn" onclick="resetView()">重置视图</button>
+            <button class="btn" onclick="zoomIn()">🔍+</button>
+            <button class="btn" onclick="zoomOut()">🔍-</button>
+        </div>
+    </div>
+    
+    <div class="movement-hint">
+        🎮 使用 WASD 或 方向键 移动 | 鼠标滚轮缩放
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="mapCanvas"></canvas>
+    </div>
+    
+    <div class="info-panel">
+        <h3>📍 Chunk 信息</h3>
+        <div class="info-row">
+            <span class="info-label">当前区块:</span>
+            <span class="info-value" id="currentChunk">(0, 0)</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">玩家位置:</span>
+            <span class="info-value" id="playerPos">(0, 0)</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">已加载区块:</span>
+            <span class="info-value" id="loadedChunks">0</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">FPS:</span>
+            <span class="info-value" id="fps">0</span>
+        </div>
+        
+        <div style="margin-top: 12px;">
+            <div style="font-size: 11px; color: #aaa; margin-bottom: 6px;">视图区块网格</div>
+            <div class="chunk-grid" id="chunkGrid"></div>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <div style="font-size: 12px; color: #00d9ff; margin-bottom: 8px; font-weight: bold;">地形图例</div>
+        <div class="legend-item"><div class="legend-color" style="background: #2d5a27;"></div><span>平原</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #3d7a37;"></div><span>森林</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #4a90d9;"></div><span>水域</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #8b7355;"></div><span>山地</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #c4a35a;"></div><span>沙漠</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #22c55e;"></div><span>玩家</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #f59e0b;"></div><span>NPC</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #ef4444;"></div><span>怪物</span></div>
+    </div>
+    
+    <script type="module">
+        import { MapEngine, ChunkManager } from './js/mapEngine.js';
+        
+        const canvas = document.getElementById('mapCanvas');
+        let mapEngine;
+        let debugMode = false;
+        
+        const terrainColors = {
+            1: '#4a7c59',   // 平原 - 绿色
+            2: '#2d5a3d',   // 森林 - 深绿
+            3: '#8b7355',   // 山地 - 棕色
+            4: '#2e6f9a',   // 水域 - 蓝色
+            5: '#6b7b5f',   // 沼泽 - 暗绿
+            6: '#5c5c5c'    // 城市 - 灰色
+        };
+        
+        class ServerChunkManager extends ChunkManager {
+            constructor(engine) {
+                super(engine);
+                this.loadingChunks = new Set();
+            }
+            
+            requestChunkData(chunkPos) {
+                return new Promise((resolve, reject) => {
+                    const key = this.getChunkKey(chunkPos);
+                    this.loadingChunks.add(key);
+                    updateChunkGrid();
+                    
+                    fetch(`/api/map/chunk?x=${chunkPos.x}&y=${chunkPos.y}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const tiles = [];
+                            const size = this.engine.config.chunkSize / this.engine.config.tileSize;
+                            
+                            for (let y = 0; y < size; y++) {
+                                for (let x = 0; x < size; x++) {
+                                    const tileIndex = y * size + x;
+                                    if (data.tiles && data.tiles[y] && data.tiles[y][x]) {
+                                        tiles.push(data.tiles[y][x].terrain || 1);
+                                    } else {
+                                        tiles.push(1);
+                                    }
+                                }
+                            }
+                            
+                            const entities = [];
+                            if (data.entities) {
+                                for (const entity of data.entities) {
+                                    entities.push({
+                                        id: entity.EntityID || Math.random().toString(36).substr(2, 9),
+                                        type: this.getEntityType(entity.EntityType),
+                                        name: entity.Name || 'Entity',
+                                        x: entity.Pos?.X || chunkPos.x * this.engine.config.chunkSize + 128,
+                                        y: entity.Pos?.Y || chunkPos.y * this.engine.config.chunkSize + 128,
+                                        z: entity.Pos?.Z || 0
+                                    });
+                                }
+                            }
+                            
+                            this.loadingChunks.delete(key);
+                            updateChunkGrid();
+                            resolve({ tiles, entities });
+                        })
+                        .catch(err => {
+                            console.error('Failed to load chunk:', err);
+                            this.loadingChunks.delete(key);
+                            updateChunkGrid();
+                            reject(err);
+                        });
+                });
+            }
+            
+            getEntityType(entityType) {
+                switch (entityType) {
+                    case 1: return 'monster';
+                    case 2: return 'npc';
+                    case 3: return 'treasure';
+                    case 4: return 'portal';
+                    default: return 'npc';
+                }
+            }
+        }
+        
+        function init() {
+            mapEngine = new MapEngine({
+                chunkSize: 256,
+                viewRange: 3,
+                tileSize: 16,
+                renderMode: '2d'
+            });
+            
+            mapEngine.chunkManager = new ServerChunkManager(mapEngine);
+            mapEngine.init(canvas);
+            
+            setupControls();
+            updateChunkGrid();
+            mapEngine.setDebugMode(false);
+            
+            setInterval(updateInfo, 100);
+        }
+        
+        function setupControls() {
+            const keys = {};
+            
+            document.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+                    e.preventDefault();
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+            });
+            
+            let lastMoveTime = 0;
+            const moveSpeed = 3;
+            
+            function processMovement() {
+                const now = performance.now();
+                if (now - lastMoveTime < 16) {
+                    requestAnimationFrame(processMovement);
+                    return;
+                }
+                lastMoveTime = now;
+                
+                let dx = 0, dy = 0;
+                
+                if (keys['w'] || keys['arrowup']) dy -= moveSpeed;
+                if (keys['s'] || keys['arrowdown']) dy += moveSpeed;
+                if (keys['a'] || keys['arrowleft']) dx -= moveSpeed;
+                if (keys['d'] || keys['arrowright']) dx += moveSpeed;
+                
+                if (dx !== 0 || dy !== 0) {
+                    const pos = mapEngine.getPlayerPosition();
+                    mapEngine.setPlayerPosition({
+                        x: pos.x + dx,
+                        y: pos.y + dy,
+                        z: pos.z
+                    });
+                }
+                
+                requestAnimationFrame(processMovement);
+            }
+            
+            requestAnimationFrame(processMovement);
+            
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                const currentScale = mapEngine.viewport.getScale();
+                mapEngine.viewport.setScale(Math.max(0.5, Math.min(3, currentScale + delta)));
+            });
+        }
+        
+        function updateInfo() {
+            const pos = mapEngine.getPlayerPosition();
+            const chunk = mapEngine.chunkManager.worldToChunk(pos);
+            const chunkCount = mapEngine.chunkManager.loadedChunks.size;
+            
+            document.getElementById('currentChunk').textContent = `(${chunk.x}, ${chunk.y})`;
+            document.getElementById('playerPos').textContent = `(${Math.floor(pos.x)}, ${Math.floor(pos.y)})`;
+            document.getElementById('loadedChunks').textContent = chunkCount;
+            document.getElementById('fps').textContent = mapEngine.fps;
+            
+            updateChunkGrid();
+        }
+        
+        function updateChunkGrid() {
+            const grid = document.getElementById('chunkGrid');
+            const centerChunk = mapEngine.chunkManager.worldToChunk(mapEngine.playerWorldPos);
+            const range = 3;
+            
+            let html = '';
+            for (let dy = -range; dy <= range; dy++) {
+                for (let dx = -range; dx <= range; dx++) {
+                    const chunkPos = { x: centerChunk.x + dx, y: centerChunk.y + dy };
+                    const key = `${chunkPos.x},${chunkPos.y}`;
+                    const isLoaded = mapEngine.chunkManager.loadedChunks.has(key);
+                    const isLoading = mapEngine.chunkManager.loadingChunks.has(key);
+                    const isCenter = dx === 0 && dy === 0;
+                    
+                    let className = 'chunk-cell';
+                    if (isCenter) className += ' center';
+                    else if (isLoaded) className += ' loaded';
+                    else if (isLoading) className += ' loading';
+                    else className += ' unloaded';
+                    
+                    html += `<div class="${className}" title="(${chunkPos.x}, ${chunkPos.y})">${dx + 3},${dy + 3}</div>`;
+                }
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        function toggleDebug() {
+            debugMode = !debugMode;
+            mapEngine.setDebugMode(debugMode);
+        }
+        
+        function resetView() {
+            mapEngine.setPlayerPosition({ x: 0, y: 0, z: 0 });
+            mapEngine.viewport.setScale(1);
+        }
+        
+        function zoomIn() {
+            const currentScale = mapEngine.viewport.getScale();
+            mapEngine.viewport.setScale(Math.min(3, currentScale + 0.2));
+        }
+        
+        function zoomOut() {
+            const currentScale = mapEngine.viewport.getScale();
+            mapEngine.viewport.setScale(Math.max(0.5, currentScale - 0.2));
+        }
+        
+        window.onload = init;
+        window.toggleDebug = toggleDebug;
+        window.resetView = resetView;
+        window.zoomIn = zoomIn;
+        window.zoomOut = zoomOut;
+    </script>
+</body>
+</html>

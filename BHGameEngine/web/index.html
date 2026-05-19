@@ -176,6 +176,13 @@
         .stat-value { font-size: 18px; font-weight: 600; color: #00d4ff; }
         .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
         
+        /* 状态面板 */
+        .status-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .status-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; text-align: center; }
+        .status-value { font-size: 14px; font-weight: 600; color: #f59e0b; }
+        .status-label { font-size: 10px; color: #888; margin-top: 2px; }
+        
         /* 装备栏 */
         .equipment-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .equipment-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -223,9 +230,11 @@
         .map-canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         .map-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
         .player-marker { position: absolute; width: 32px; height: 32px; background: #00d4ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(0,212,255,0.5); pointer-events: none; }
-        .npc-marker { position: absolute; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(245,158,11,0.5); pointer-events: none; }
-        .monster-marker { position: absolute; width: 20px; height: 20px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(239,68,68,0.5); pointer-events: none; }
-        .coordinate-display { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-size: 12px; color: #00d4ff; pointer-events: none; }
+        
+        .coordinate-display { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; font-size: 11px; pointer-events: none; }
+        #worldCoord { color: #00d4ff; margin-bottom: 2px; }
+        #localCoord { color: #22c55e; margin-bottom: 2px; }
+        #chunkCoord { color: #f59e0b; }
         
         /* 控制区域 */
         .control-area { height: 80px; background: rgba(255,255,255,0.03); border-top: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; gap: 20px; }
@@ -344,7 +353,6 @@
             </div>
             <div class="header-right">
                 <button class="btn" onclick="openAttackMode()">⚔️ 攻击</button>
-                
                 <button class="btn" onclick="document.getElementById('settingsPanel').classList.toggle('hidden')">⚙️ 设置</button>
                 <button class="btn" onclick="handleLogout()">📤 登出</button>
             </div>
@@ -389,10 +397,20 @@
             <div class="stats-panel">
                 <div class="panel-title">属性</div>
                 <div class="stats-grid">
-                    <div class="stat-item"><div class="stat-value">15</div><div class="stat-label">攻击</div></div>
-                    <div class="stat-item"><div class="stat-value">10</div><div class="stat-label">防御</div></div>
-                    <div class="stat-item"><div class="stat-value">500</div><div class="stat-label">经验</div></div>
-                    <div class="stat-item"><div class="stat-value">1000</div><div class="stat-label">金币</div></div>
+                    <div class="stat-item"><div class="stat-value" id="statStrength">10</div><div class="stat-label">力量</div></div>
+                    <div class="stat-item"><div class="stat-value" id="statAgility">10</div><div class="stat-label">敏捷</div></div>
+                    <div class="stat-item"><div class="stat-value" id="statIntelligence">10</div><div class="stat-label">智力</div></div>
+                    <div class="stat-item"><div class="stat-value" id="statDefense">5</div><div class="stat-label">防御</div></div>
+                </div>
+            </div>
+            
+            <!-- 状态面板 -->
+            <div class="status-panel">
+                <div class="panel-title">状态</div>
+                <div class="status-grid">
+                    <div class="status-item"><div class="status-value" id="statusLevel">Lv.1</div><div class="status-label">等级</div></div>
+                    <div class="status-item"><div class="status-value" id="statusExp">0</div><div class="status-label">经验</div></div>
+                    <div class="status-item"><div class="status-value" id="statusGold">1000</div><div class="status-label">金币</div></div>
                 </div>
             </div>
             
@@ -440,10 +458,11 @@
                 <canvas id="mapCanvas" class="map-canvas"></canvas>
                 <div class="map-overlay">
                     <div class="player-marker" id="playerMarker" style="display: none;"></div>
-                    <div class="npc-marker" style="left: 30%; top: 30%;"></div>
-                    <div class="monster-marker" style="left: 70%; top: 60%;"></div>
-                    <div class="monster-marker" style="left: 40%; top: 70%;"></div>
-                    <div class="coordinate-display" id="coordDisplay">X: 0, Y: 0</div>
+                    <div class="coordinate-display">
+                        <div id="worldCoord">世界: (0, 0)</div>
+                        <div id="localCoord">本地: (0, 0)</div>
+                        <div id="chunkCoord">Chunk: (0, 0)</div>
+                    </div>
                 </div>
             </div>
             
@@ -589,12 +608,19 @@
         // 游戏状态
         let playerX = 512, playerY = 512;
         let playerHealth = MAX_HEALTH, playerMana = MAX_MANA, playerStamina = MAX_STAMINA;
+        let maxHealth = MAX_HEALTH, maxMana = MAX_MANA, maxStamina = MAX_STAMINA;
         let monsterHealth = 80;
         let isInBattle = false;
         let currentTarget = null;
         let sessionID = '';
         let playerID = 0;
         let battleID = 0;  // 战斗ID，用于后端战斗系统
+        let playerLevel = 1;
+        let playerExp = 0;
+        let playerStrength = 10;
+        let playerAgility = 10;
+        let playerIntelligence = 10;
+        let playerDefense = 5;
         
         // 背包状态
         let inventoryItems = {};      // 物品 {slot: {itemID, count, level, uid}}
@@ -888,20 +914,26 @@
                          direction === 'left' ? {x: -moveSpeed, y: 0} :
                          {x: moveSpeed, y: 0};
             
-            playerX += delta.x;
-            playerY += delta.y;
+            // 边界检查：确保坐标不小于0
+            const newX = playerX + delta.x;
+            const newY = playerY + delta.y;
             
-            updatePlayerMarker();
-            document.getElementById('debugPos').textContent = Math.floor(playerX) + ', ' + Math.floor(playerY);
-            updateCoordinateDisplay();
-            
-            if (mapEngine) {
-                mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+            if (newX >= 0 && newY >= 0) {
+                playerX = newX;
+                playerY = newY;
+                
+                updatePlayerMarker();
+                document.getElementById('debugPos').textContent = Math.floor(playerX) + ', ' + Math.floor(playerY);
+                updateCoordinateDisplay();
+                
+                if (mapEngine) {
+                    mapEngine.setPlayerPosition({ x: playerX, y: playerY, z: 0 });
+                }
+                
+                sendMessage(MSG.PLAYER_MOVE_REQ, {player_id: playerID, session_id: sessionID, target_x: playerX, target_y: playerY});
+                
+                checkNPCInteraction();
             }
-            
-            sendMessage(MSG.PLAYER_MOVE_REQ, {player_id: playerID, session_id: sessionID, target_x: playerX, target_y: playerY});
-            
-            checkNPCInteraction();
         }
         
         // 更新玩家标记位置（现在由地图引擎渲染）
@@ -911,7 +943,8 @@
         
         // WebSocket连接
         function connectWebSocket() {
-            const addr = 'ws://localhost:7070/ws';
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const addr = protocol + window.location.host + '/ws';
             console.log('Connecting to:', addr);
             
             if (ws) {
@@ -1073,6 +1106,10 @@
                     case MSG.ITEM_USE_RES: handleItemUseResponse(msg); break;
                     case MSG.EQUIP_ITEM_RES: handleEquipResponse(msg); break;
                     case MSG.UNEQUIP_ITEM_RES: handleUnequipResponse(msg); break;
+                    case MSG.MAP_ENTITY_RES: handleMapEntityResponse(msg); break;
+                    case MSG.MAP_PLAYER_SYNC: handlePlayerSync(msg); break;
+                    case MSG.MAP_ENTITY_SYNC: handleEntitySync(msg); break;
+                    case 4007: handleBattleStart(msg); break;
                     case MSG.PONG: break;
                 }
             } catch (e) {
@@ -1247,39 +1284,75 @@
             if (data.health !== undefined) playerHealth = data.health;
             if (data.mana !== undefined) playerMana = data.mana;
             if (data.stamina !== undefined) playerStamina = data.stamina;
+            if (data.max_health !== undefined) maxHealth = data.max_health;
+            if (data.max_mana !== undefined) maxMana = data.max_mana;
+            if (data.max_stamina !== undefined) maxStamina = data.max_stamina;
+            if (data.level !== undefined) playerLevel = data.level;
+            if (data.exp !== undefined) playerExp = data.exp;
+            if (data.strength !== undefined) playerStrength = data.strength;
+            if (data.agility !== undefined) playerAgility = data.agility;
+            if (data.intelligence !== undefined) playerIntelligence = data.intelligence;
+            if (data.defense !== undefined) playerDefense = data.defense;
             updatePlayerStats();
         }
         
         // 更新玩家属性显示
         function updatePlayerStats() {
             // 限制值在有效范围内（0到上限之间）
-            playerHealth = Math.max(0, Math.min(MAX_HEALTH, playerHealth));
-            playerMana = Math.max(0, Math.min(MAX_MANA, playerMana));
-            playerStamina = Math.max(0, Math.min(MAX_STAMINA, playerStamina));
+            playerHealth = Math.max(0, Math.min(maxHealth, playerHealth));
+            playerMana = Math.max(0, Math.min(maxMana, playerMana));
+            playerStamina = Math.max(0, Math.min(maxStamina, playerStamina));
             
             // 更新数值显示
-            document.getElementById('healthVal').textContent = Math.round(playerHealth) + '/' + MAX_HEALTH;
-            document.getElementById('manaVal').textContent = Math.round(playerMana) + '/' + MAX_MANA;
-            document.getElementById('staminaVal').textContent = Math.round(playerStamina) + '/' + MAX_STAMINA;
+            document.getElementById('healthVal').textContent = Math.round(playerHealth) + '/' + maxHealth;
+            document.getElementById('manaVal').textContent = Math.round(playerMana) + '/' + maxMana;
+            document.getElementById('staminaVal').textContent = Math.round(playerStamina) + '/' + maxStamina;
             
             // 计算进度条百分比并更新
-            const healthPercent = (playerHealth / MAX_HEALTH) * 100;
-            const manaPercent = (playerMana / MAX_MANA) * 100;
-            const staminaPercent = (playerStamina / MAX_STAMINA) * 100;
+            const healthPercent = (playerHealth / maxHealth) * 100;
+            const manaPercent = (playerMana / maxMana) * 100;
+            const staminaPercent = (playerStamina / maxStamina) * 100;
             
             document.getElementById('healthBar').style.width = healthPercent + '%';
             document.getElementById('manaBar').style.width = manaPercent + '%';
             document.getElementById('staminaBar').style.width = staminaPercent + '%';
             
             // 更新战斗UI
-            document.getElementById('playerHealth').textContent = Math.round(playerHealth) + '/' + MAX_HEALTH;
+            document.getElementById('playerHealth').textContent = Math.round(playerHealth) + '/' + maxHealth;
             document.getElementById('playerHealthBar').style.width = healthPercent + '%';
-            document.getElementById('playerHealthBar').className = 'battle-health-fill' + (playerHealth < MAX_HEALTH * 0.3 ? ' danger' : '');
+            document.getElementById('playerHealthBar').className = 'battle-health-fill' + (playerHealth < maxHealth * 0.3 ? ' danger' : '');
+            
+            // 更新属性面板
+            document.getElementById('statStrength').textContent = playerStrength;
+            document.getElementById('statAgility').textContent = playerAgility;
+            document.getElementById('statIntelligence').textContent = playerIntelligence;
+            document.getElementById('statDefense').textContent = playerDefense;
+            
+            // 更新状态面板
+            document.getElementById('statusLevel').textContent = 'Lv.' + playerLevel;
+            document.getElementById('statusExp').textContent = playerExp;
+            document.getElementById('statusGold').textContent = playerGold;
         }
         
         // 更新坐标显示
         function updateCoordinateDisplay() {
-            document.getElementById('coordDisplay').textContent = 'X: ' + playerX + ', Y: ' + playerY;
+            const CHUNK_SIZE = 256;
+            
+            // 世界坐标
+            const worldX = Math.floor(playerX);
+            const worldY = Math.floor(playerY);
+            
+            // 本地坐标（相对于当前chunk）
+            const localX = worldX % CHUNK_SIZE;
+            const localY = worldY % CHUNK_SIZE;
+            
+            // Chunk ID
+            const chunkX = Math.floor(playerX / CHUNK_SIZE);
+            const chunkY = Math.floor(playerY / CHUNK_SIZE);
+            
+            document.getElementById('worldCoord').textContent = `世界: (${worldX}, ${worldY})`;
+            document.getElementById('localCoord').textContent = `本地: (${localX}, ${localY})`;
+            document.getElementById('chunkCoord').textContent = `Chunk: (${chunkX}, ${chunkY})`;
         }
         
         // 切换登录/注册
@@ -1628,6 +1701,64 @@
             div.textContent = msg;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+        }
+        
+        // 战斗开始处理
+        function handleBattleStart(data) {
+            console.log('Battle started:', data);
+            if (data.message === 'battle_start') {
+                alert('你进入了战斗！');
+                startBattle(1);
+            }
+        }
+        
+        // 地图实体响应处理
+        function handleMapEntityResponse(data) {
+            console.log('Map entities:', data);
+            if (data.entities) {
+                updateNearbyMonsters(data.entities);
+            }
+        }
+        
+        // 玩家同步处理
+        function handlePlayerSync(data) {
+            console.log('Player sync:', data);
+        }
+        
+        // 实体同步处理
+        function handleEntitySync(data) {
+            console.log('Entity sync:', data);
+            if (data.entities) {
+                updateNearbyMonsters(data.entities);
+            }
+        }
+        
+        // 更新附近怪物列表
+        function updateNearbyMonsters(entities) {
+            const panel = document.querySelector('.monsters-panel');
+            if (!panel) return;
+            
+            const container = panel.querySelector('.monsters-container');
+            if (!container) {
+                const containerDiv = document.createElement('div');
+                containerDiv.className = 'monsters-container';
+                panel.appendChild(containerDiv);
+            }
+            
+            const monsterItems = entities.filter(e => e.entity_type === 1 || e.EntityType === 1);
+            const containerEl = panel.querySelector('.monsters-container');
+            containerEl.innerHTML = '';
+            
+            monsterItems.forEach((monster, index) => {
+                const item = document.createElement('div');
+                item.className = 'monster-item';
+                item.innerHTML = `
+                    <span class="monster-name">${monster.name || monster.Name}</span>
+                    <span class="monster-level">Lv.${monster.level || 1}</span>
+                `;
+                item.onclick = () => startBattle(index + 1);
+                containerEl.appendChild(item);
+            });
         }
         
         // 聊天响应
