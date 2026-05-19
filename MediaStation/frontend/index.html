@@ -2,152 +2,131 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaStation - 音视频媒体平台</title>
-    <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MediaStation - 探索自然之美</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .logo-icon {
+            color: #1a73e8;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .logo-text {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .loading-text {
+            font-size: 1rem;
+            color: #999999;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1a73e8, #4285f4);
+            border-radius: 2px;
+            animation: loading 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes loading {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
+        .device-info {
+            position: fixed;
+            bottom: 1rem;
+            font-size: 0.8rem;
+            color: #666666;
+        }
+    </style>
 </head>
 <body>
-    <header class="header">
-        <div class="logo">MediaStation</div>
-        <nav class="nav">
-            <a href="#video" class="nav-item active">视频</a>
-            <a href="#audio" class="nav-item">音频</a>
-            <a href="#image" class="nav-item">图片</a>
-            <a href="#novel" class="nav-item">小说</a>
-        </nav>
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="搜索...">
-            <button id="searchBtn">搜索</button>
-        </div>
-        <div class="user-panel">
-            <button id="loginBtn">登录</button>
-            <button id="registerBtn">注册</button>
-        </div>
-    </header>
-
-    <main class="main">
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <h3>分类</h3>
-                <ul class="category-list">
-                    <li><a href="#" data-type="video">全部视频</a></li>
-                    <li><a href="#" data-type="short">短剧</a></li>
-                    <li><a href="#" data-type="movie">电影</a></li>
-                    <li><a href="#" data-type="tv">电视剧</a></li>
-                </ul>
-            </div>
-            <div class="sidebar-section">
-                <h3>播放历史</h3>
-                <ul id="historyList" class="history-list"></ul>
-            </div>
-        </aside>
-
-        <section class="content">
-            <div id="videoSection" class="section active">
-                <h2>视频</h2>
-                <div id="videoGrid" class="media-grid"></div>
-            </div>
-
-            <div id="audioSection" class="section">
-                <h2>音频</h2>
-                <div id="audioGrid" class="media-grid"></div>
-            </div>
-
-            <div id="imageSection" class="section">
-                <h2>图片</h2>
-                <div id="imageGrid" class="media-grid"></div>
-            </div>
-
-            <div id="novelSection" class="section">
-                <h2>小说</h2>
-                <div id="novelGrid" class="media-grid"></div>
-            </div>
-        </section>
-    </main>
-
-    <div id="playerModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <div class="player-container">
-                <video id="videoPlayer" controlslist="nodownload nofullscreen noremoteplayback" disablePictureInPicture playsinline></video>
-                <div id="loadingIndicator" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-size:18px;">
-                    <div>⏳ 正在跳转...</div>
-                </div>
-                <div class="player-controls">
-                    <button id="playPauseBtn">播放</button>
-                    <input type="range" id="progressBar" min="0" max="100" value="0">
-                    <span id="timeDisplay">00:00 / 00:00</span>
-                    <select id="playbackSpeed">
-                        <option value="0.5">0.5x</option>
-                        <option value="0.75">0.75x</option>
-                        <option value="1" selected>1x</option>
-                        <option value="1.25">1.25x</option>
-                        <option value="1.5">1.5x</option>
-                        <option value="2">2x</option>
-                    </select>
-                    <button id="fullscreenBtn">全屏</button>
-                    <button id="screenshotBtn">截图</button>
-                    <button id="rotateBtn">旋转</button>
-                </div>
-                <div class="episode-list">
-                    <h4>剧集列表</h4>
-                    <div id="episodeContainer"></div>
-                </div>
-            </div>
-        </div>
+    <div class="logo">
+        <span class="logo-icon">▶</span>
+        <span class="logo-text">MediaStation</span>
     </div>
-
-    <div id="imageViewer" class="modal">
-        <div class="modal-content image-viewer-content">
-            <span class="close">&times;</span>
-            <img id="viewImage" src="" alt="">
-            <div class="image-nav">
-                <button id="prevImage">上一个</button>
-                <button id="nextImage">下一个</button>
-            </div>
-        </div>
+    <div class="loading-text">正在检测设备...</div>
+    <div class="progress-bar">
+        <div class="progress-fill"></div>
     </div>
+    <div class="device-info" id="deviceInfo"></div>
 
-    <div id="novelReader" class="modal">
-        <div class="modal-content novel-reader-content">
-            <span class="close">&times;</span>
-            <div class="novel-header">
-                <h3 id="novelTitle"></h3>
-            </div>
-            <div id="novelContent"></div>
-            <div class="novel-nav">
-                <button id="prevChapter">上一个</button>
-                <button id="nextChapter">下一个</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="loginModal" class="modal">
-        <div class="modal-content auth-modal">
-            <span class="close">&times;</span>
-            <h2>登录</h2>
-            <form id="loginForm">
-                <input type="text" id="loginUsername" placeholder="用户名" required>
-                <input type="password" id="loginPassword" placeholder="密码" required>
-                <button type="submit">登录</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="registerModal" class="modal">
-        <div class="modal-content auth-modal">
-            <span class="close">&times;</span>
-            <h2>注册</h2>
-            <form id="registerForm">
-                <input type="text" id="regUsername" placeholder="用户名" required>
-                <input type="email" id="regEmail" placeholder="邮箱">
-                <input type="password" id="regPassword" placeholder="密码" required>
-                <button type="submit">注册</button>
-            </form>
-        </div>
-    </div>
-
-    <script src="js/app.js"></script>
+    <script>
+        function detectDevice() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            
+            const mobileKeywords = [
+                'iphone', 'ipad', 'ipod', 'android', 'blackberry',
+                'windows phone', 'mobile', 'tablet'
+            ];
+            
+            const isMobile = mobileKeywords.some(keyword => userAgent.includes(keyword));
+            const screenWidth = window.innerWidth;
+            const isSmallScreen = screenWidth < 768;
+            
+            return isMobile || isSmallScreen;
+        }
+        
+        function redirect() {
+            const isMobile = detectDevice();
+            const deviceInfo = document.getElementById('deviceInfo');
+            
+            if (isMobile) {
+                deviceInfo.textContent = '检测到移动设备，正在跳转到移动端...';
+                setTimeout(() => {
+                    window.location.href = 'mobile/index.html';
+                }, 500);
+            } else {
+                deviceInfo.textContent = '检测到桌面设备，正在跳转到PC端...';
+                setTimeout(() => {
+                    window.location.href = 'pc/index.html';
+                }, 500);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', redirect);
+        
+        window.addEventListener('resize', () => {
+            const currentPath = window.location.pathname;
+            if (!currentPath.includes('mobile') && !currentPath.includes('pc')) {
+                redirect();
+            }
+        });
+    </script>
 </body>
 </html>
