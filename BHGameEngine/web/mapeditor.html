@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地图编辑器 - BHGameEngine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #fff; }
+        
+        .header { background: #16213e; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; color: #00d9ff; }
+        .header .tools { display: flex; gap: 10px; }
+        
+        .main-container { display: flex; height: calc(100vh - 52px); }
+        
+        .sidebar { width: 280px; background: #0f3460; padding: 15px; overflow-y: auto; }
+        .canvas-container { flex: 1; display: flex; flex-direction: column; background: #16213e; }
+        
+        .panel { margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; }
+        .panel h3 { color: #00d9ff; margin-bottom: 10px; font-size: 14px; }
+        .panel label { display: block; margin: 8px 0 4px; font-size: 12px; color: #aaa; }
+        .panel input, .panel select, .panel button { width: 100%; padding: 8px; border: none; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff; }
+        .panel input:focus, .panel select:focus { outline: 2px solid #00d9ff; }
+        .panel button { background: #00d9ff; color: #1a1a2e; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+        .panel button:hover { background: #00b8d4; }
+        .panel button:disabled { background: #444; cursor: not-allowed; }
+        
+        .btn-group { display: flex; gap: 5px; }
+        .btn-group button { flex: 1; }
+        
+        #mapCanvas { border: 2px solid #00d9ff; background: #2d3436; }
+        
+        .tile-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .tile-item { width: 32px; height: 32px; border: 2px solid transparent; cursor: pointer; border-radius: 4px; transition: transform 0.2s; }
+        .tile-item:hover { transform: scale(1.1); }
+        .tile-item.selected { border-color: #00d9ff; box-shadow: 0 0 10px #00d9ff; }
+        
+        .info-panel { font-size: 12px; color: #aaa; margin-top: 10px; }
+        .info-panel div { padding: 4px 0; }
+        
+        .entity-list { max-height: 150px; overflow-y: auto; }
+        .entity-item { padding: 6px; background: rgba(255,255,255,0.05); margin: 4px 0; border-radius: 4px; cursor: pointer; }
+        .entity-item:hover { background: rgba(255,255,255,0.1); }
+        
+        .toolbar { padding: 10px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; }
+        .tool-btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; background: rgba(0,217,255,0.2); color: #00d9ff; transition: all 0.3s; }
+        .tool-btn.active { background: #00d9ff; color: #1a1a2e; }
+        .tool-btn:hover { background: rgba(0,217,255,0.3); }
+        
+        .status-bar { padding: 8px 15px; background: rgba(0,0,0,0.3); font-size: 12px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ BHGameEngine 地图编辑器</h1>
+        <div class="tools">
+            <button onclick="saveMap()" style="padding: 8px 16px; background: #2ecc71; color: #fff; border: none; border-radius: 4px; cursor: pointer;">💾 保存</button>
+            <button onclick="exportMap()" style="padding: 8px 16px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer;">📤 导出</button>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="panel">
+                <h3>📍 区块位置</h3>
+                <div style="display: flex; gap: 8px;">
+                    <div style="flex: 1;">
+                        <label>Chunk X</label>
+                        <input type="number" id="chunkX" value="0" onchange="loadChunk()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Chunk Y</label>
+                        <input type="number" id="chunkY" value="0" onchange="loadChunk()">
+                    </div>
+                </div>
+                <button onclick="loadChunk()">加载区块</button>
+                <button onclick="generateChunk()">生成区块</button>
+            </div>
+            
+            <div class="panel">
+                <h3>🎨 瓦片调色板</h3>
+                <div class="tile-palette" id="tilePalette"></div>
+            </div>
+            
+            <div class="panel">
+                <h3>⚙️ 瓦片属性</h3>
+                <label>Tile ID</label>
+                <input type="number" id="tileID" value="1">
+                <label>地形类型</label>
+                <select id="terrainType">
+                    <option value="1">平原</option>
+                    <option value="2">森林</option>
+                    <option value="3">山地</option>
+                    <option value="4">水域</option>
+                    <option value="5">沼泽</option>
+                    <option value="6">城市</option>
+                </select>
+                <label>高度</label>
+                <input type="number" id="tileHeight" value="0" step="0.5">
+                <label>可行走</label>
+                <input type="checkbox" id="walkable" checked>
+            </div>
+            
+            <div class="panel">
+                <h3>👾 添加实体</h3>
+                <label>实体ID</label>
+                <input type="number" id="entityID" value="1000">
+                <label>实体名称</label>
+                <input type="text" id="entityName" value="Monster">
+                <label>实体类型</label>
+                <select id="entityType">
+                    <option value="1">怪物</option>
+                    <option value="2">NPC</option>
+                    <option value="3">宝箱</option>
+                    <option value="4">传送点</option>
+                </select>
+                <button onclick="addEntity()">添加实体</button>
+            </div>
+            
+            <div class="panel">
+                <h3>📋 实体列表</h3>
+                <div class="entity-list" id="entityList"></div>
+            </div>
+            
+            <div class="panel">
+                <h3>📖 使用说明</h3>
+                <div style="font-size: 12px; color: #ccc; line-height: 1.6;">
+                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <strong style="color: #00d9ff;">🎯 工具栏</strong>
+                        <div style="margin-top: 5px;">
+                            <div>🖌️ <strong>绘制</strong>: 点击画布绘制瓦片</div>
+                            <div>👆 <strong>选择</strong>: 点击瓦片查看属性</div>
+                            <div>🧹 <strong>擦除</strong>: 恢复默认瓦片</div>
+                            <div>🎯 <strong>填充</strong>: 区域填充相同瓦片</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <strong style="color: #00d9ff;">🗺️ 区块操作</strong>
+                        <div style="margin-top: 5px;">
+                            <div>• 输入坐标后点击"加载区块"</div>
+                            <div>• 点击"生成区块"创建新区块</div>
+                            <div>• 区块大小: 256×256 瓦片</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <strong style="color: #00d9ff;">🎨 瓦片调色板</strong>
+                        <div style="margin-top: 5px;">
+                            <div>• 点击选择瓦片类型</div>
+                            <div>• 支持6种地形类型</div>
+                            <div>• 绿色=平原 | 深绿=森林</div>
+                            <div>• 棕色=山地 | 蓝色=水域</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong style="color: #00d9ff;">👾 实体管理</strong>
+                        <div style="margin-top: 5px;">
+                            <div>• 填写实体信息后添加</div>
+                            <div>• 点击实体列表删除</div>
+                            <div>• 红色圆点表示实体位置</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <strong style="color: #00d9ff;">💾 保存导出</strong>
+                        <div style="margin-top: 5px;">
+                            <div>• 💾 保存: 保存到服务器</div>
+                            <div>• 📤 导出: 下载JSON文件</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="toolbar">
+                <button class="tool-btn active" onclick="setTool('paint')" title="绘制">🖌️ 绘制</button>
+                <button class="tool-btn" onclick="setTool('select')" title="选择">👆 选择</button>
+                <button class="tool-btn" onclick="setTool('eraser')" title="擦除">🧹 擦除</button>
+                <button class="tool-btn" onclick="setTool('fill')" title="填充">🎯 填充</button>
+                <button class="tool-btn" onclick="clearCanvas()" title="清空">🗑️ 清空</button>
+            </div>
+            
+            <canvas id="mapCanvas" width="800" height="600" onmousedown="onMouseDown(event)" onmousemove="onMouseMove(event)" onmouseup="onMouseUp(event)" onmouseleave="onMouseUp(event)"></canvas>
+            
+            <div class="status-bar" id="statusBar">
+                位置: (0, 0) | 瓦片: ID=1, 地形=平原 | 工具: 绘制
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TILE_SIZE = 16;
+        const CHUNK_SIZE = 256;
+        const CANVAS_TILES = 50;
+        
+        let ctx = document.getElementById('mapCanvas').getContext('2d');
+        let currentTool = 'paint';
+        let isDrawing = false;
+        let selectedTile = { tileID: 1, terrain: 1, height: 0, walkable: true };
+        let currentChunk = { x: 0, y: 0, tiles: [], entities: [] };
+        
+        const terrainColors = {
+            1: '#4a7c59',   // 平原 - 绿色
+            2: '#2d5a3d',   // 森林 - 深绿
+            3: '#8b7355',   // 山地 - 棕色
+            4: '#2e6f9a',   // 水域 - 蓝色
+            5: '#6b7b5f',   // 沼泽 - 暗绿
+            6: '#5c5c5c'    // 城市 - 灰色
+        };
+        
+        function init() {
+            initTilePalette();
+            loadChunk();
+        }
+        
+        function initTilePalette() {
+            const palette = document.getElementById('tilePalette');
+            for (let terrain = 1; terrain <= 6; terrain++) {
+                for (let i = 0; i < 4; i++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile-item';
+                    tile.style.backgroundColor = terrainColors[terrain];
+                    tile.dataset.terrain = terrain;
+                    tile.dataset.tileid = (terrain - 1) * 100 + i;
+                    tile.onclick = () => selectTile(parseInt(tile.dataset.tileid), parseInt(tile.dataset.terrain));
+                    palette.appendChild(tile);
+                }
+            }
+            selectTile(1, 1);
+        }
+        
+        function selectTile(tileID, terrain) {
+            document.querySelectorAll('.tile-item').forEach(t => t.classList.remove('selected'));
+            event.target.classList.add('selected');
+            selectedTile = { tileID, terrain, height: 0, walkable: true };
+            document.getElementById('tileID').value = tileID;
+            document.getElementById('terrainType').value = terrain;
+        }
+        
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            updateStatus();
+        }
+        
+        function loadChunk() {
+            const x = parseInt(document.getElementById('chunkX').value) || 0;
+            const y = parseInt(document.getElementById('chunkY').value) || 0;
+            currentChunk.x = x;
+            currentChunk.y = y;
+            
+            fetch(`/api/map/chunk?x=${x}&y=${y}`)
+                .then(res => res.json())
+                .then(data => {
+                    currentChunk.tiles = data.tiles || generateEmptyTiles();
+                    currentChunk.entities = data.entities || [];
+                    renderMap();
+                    updateEntityList();
+                })
+                .catch(() => {
+                    currentChunk.tiles = generateEmptyTiles();
+                    currentChunk.entities = [];
+                    renderMap();
+                });
+        }
+        
+        function generateChunk() {
+            const x = parseInt(document.getElementById('chunkX').value) || 0;
+            const y = parseInt(document.getElementById('chunkY').value) || 0;
+            
+            fetch(`/api/map/generate?x=${x}&y=${y}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    currentChunk = data;
+                    renderMap();
+                    updateEntityList();
+                    alert('区块生成成功！');
+                });
+        }
+        
+        function generateEmptyTiles() {
+            const tiles = [];
+            for (let i = 0; i < CHUNK_SIZE; i++) {
+                tiles[i] = [];
+                for (let j = 0; j < CHUNK_SIZE; j++) {
+                    tiles[i][j] = { tileID: 1, terrain: 1, height: 0, walkable: true };
+                }
+            }
+            return tiles;
+        }
+        
+        function renderMap() {
+            const canvas = document.getElementById('mapCanvas');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let tileX = 0; tileX < CANVAS_TILES; tileX++) {
+                for (let tileY = 0; tileY < CANVAS_TILES; tileY++) {
+                    const chunkTileX = tileX;
+                    const chunkTileY = tileY;
+                    
+                    if (currentChunk.tiles[chunkTileX] && currentChunk.tiles[chunkTileX][chunkTileY]) {
+                        const tile = currentChunk.tiles[chunkTileX][chunkTileY];
+                        const color = terrainColors[tile.terrain] || '#4a7c59';
+                        
+                        ctx.fillStyle = color;
+                        ctx.fillRect(tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        
+                        if (!tile.walkable) {
+                            ctx.fillStyle = 'rgba(255,0,0,0.3)';
+                            ctx.fillRect(tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
+                        
+                        if (tile.height > 0) {
+                            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                            ctx.fillRect(tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
+                    }
+                }
+            }
+            
+            currentChunk.entities.forEach(entity => {
+                const screenX = entity.posX % CHUNK_SIZE;
+                const screenY = entity.posY % CHUNK_SIZE;
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(entity.name.charAt(0), screenX, screenY + 3);
+            });
+        }
+        
+        function onMouseDown(e) {
+            isDrawing = true;
+            handleTile(e);
+        }
+        
+        function onMouseMove(e) {
+            if (isDrawing) {
+                handleTile(e);
+            }
+            updateStatus(e);
+        }
+        
+        function onMouseUp() {
+            isDrawing = false;
+        }
+        
+        function handleTile(e) {
+            const canvas = document.getElementById('mapCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+            
+            if (x >= 0 && x < CANVAS_TILES && y >= 0 && y < CANVAS_TILES) {
+                if (!currentChunk.tiles[x]) currentChunk.tiles[x] = [];
+                
+                if (currentTool === 'paint') {
+                    currentChunk.tiles[x][y] = {
+                        tileID: parseInt(document.getElementById('tileID').value),
+                        terrain: parseInt(document.getElementById('terrainType').value),
+                        height: parseFloat(document.getElementById('tileHeight').value),
+                        walkable: document.getElementById('walkable').checked
+                    };
+                } else if (currentTool === 'eraser') {
+                    currentChunk.tiles[x][y] = { tileID: 1, terrain: 1, height: 0, walkable: true };
+                } else if (currentTool === 'fill') {
+                    fillArea(x, y);
+                } else if (currentTool === 'select') {
+                    const tile = currentChunk.tiles[x][y];
+                    if (tile) {
+                        document.getElementById('tileID').value = tile.tileID;
+                        document.getElementById('terrainType').value = tile.terrain;
+                        document.getElementById('tileHeight').value = tile.height;
+                        document.getElementById('walkable').checked = tile.walkable;
+                    }
+                }
+                renderMap();
+            }
+        }
+        
+        function fillArea(startX, startY) {
+            const targetTile = currentChunk.tiles[startX] && currentChunk.tiles[startX][startY];
+            if (!targetTile) return;
+            
+            const targetTerrain = targetTile.terrain;
+            const newTile = {
+                tileID: parseInt(document.getElementById('tileID').value),
+                terrain: parseInt(document.getElementById('terrainType').value),
+                height: parseFloat(document.getElementById('tileHeight').value),
+                walkable: document.getElementById('walkable').checked
+            };
+            
+            const queue = [{ x: startX, y: startY }];
+            const visited = new Set();
+            
+            while (queue.length > 0) {
+                const { x, y } = queue.shift();
+                const key = `${x},${y}`;
+                
+                if (visited.has(key)) continue;
+                if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_SIZE) continue;
+                if (!currentChunk.tiles[x] || !currentChunk.tiles[x][y]) continue;
+                if (currentChunk.tiles[x][y].terrain !== targetTerrain) continue;
+                
+                visited.add(key);
+                currentChunk.tiles[x][y] = { ...newTile };
+                
+                queue.push({ x: x + 1, y });
+                queue.push({ x: x - 1, y });
+                queue.push({ x, y: y + 1 });
+                queue.push({ x, y: y - 1 });
+            }
+        }
+        
+        function clearCanvas() {
+            if (confirm('确定要清空当前区块吗？')) {
+                currentChunk.tiles = generateEmptyTiles();
+                currentChunk.entities = [];
+                renderMap();
+                updateEntityList();
+            }
+        }
+        
+        function addEntity() {
+            const canvas = document.getElementById('mapCanvas');
+            const rect = canvas.getBoundingClientRect();
+            
+            const entity = {
+                entityID: parseInt(document.getElementById('entityID').value),
+                name: document.getElementById('entityName').value,
+                entityType: parseInt(document.getElementById('entityType').value),
+                posX: canvas.width / 2 + currentChunk.x * CHUNK_SIZE,
+                posY: canvas.height / 2 + currentChunk.y * CHUNK_SIZE,
+                posZ: 0
+            };
+            
+            currentChunk.entities.push(entity);
+            renderMap();
+            updateEntityList();
+            document.getElementById('entityID').value = parseInt(document.getElementById('entityID').value) + 1;
+        }
+        
+        function updateEntityList() {
+            const list = document.getElementById('entityList');
+            list.innerHTML = '';
+            
+            currentChunk.entities.forEach((entity, index) => {
+                const item = document.createElement('div');
+                item.className = 'entity-item';
+                item.innerHTML = `${entity.name} (ID: ${entity.entityID})`;
+                item.onclick = () => {
+                    if (confirm('确定删除此实体？')) {
+                        currentChunk.entities.splice(index, 1);
+                        renderMap();
+                        updateEntityList();
+                    }
+                };
+                list.appendChild(item);
+            });
+            
+            if (currentChunk.entities.length === 0) {
+                list.innerHTML = '<div style="color: #666;">无实体</div>';
+            }
+        }
+        
+        function updateStatus(e) {
+            const status = document.getElementById('statusBar');
+            if (e) {
+                const canvas = document.getElementById('mapCanvas');
+                const rect = canvas.getBoundingClientRect();
+                const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+                const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+                
+                const terrainNames = ['', '平原', '森林', '山地', '水域', '沼泽', '城市'];
+                const tile = currentChunk.tiles[x] && currentChunk.tiles[x][y];
+                const terrainName = tile ? terrainNames[tile.terrain] : '未知';
+                const tileID = tile ? tile.tileID : 0;
+                
+                status.textContent = `位置: (${x}, ${y}) | 瓦片: ID=${tileID}, 地形=${terrainName} | 工具: ${getToolName(currentTool)}`;
+            } else {
+                status.textContent = `区块: (${currentChunk.x}, ${currentChunk.y}) | 工具: ${getToolName(currentTool)}`;
+            }
+        }
+        
+        function getToolName(tool) {
+            const names = { paint: '绘制', select: '选择', eraser: '擦除', fill: '填充' };
+            return names[tool] || tool;
+        }
+        
+        function saveMap() {
+            fetch('/api/map/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentChunk)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('地图保存成功！');
+                } else {
+                    alert('保存失败: ' + data.message);
+                }
+            });
+        }
+        
+        function exportMap() {
+            const dataStr = JSON.stringify(currentChunk, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chunk_${currentChunk.x}_${currentChunk.y}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        window.onload = init;
+    </script>
+</body>
+</html>

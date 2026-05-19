@@ -27,6 +27,8 @@ type Config struct {
 		ChunkSize          int    `toml:"chunk_size"`
 		ViewDistance       int    `toml:"view_distance"`
 		MaxPlayersPerChunk int    `toml:"max_players_per_chunk"`
+		MapDataDir         string `toml:"map_data_dir"`
+		GridCount          int    `toml:"grid_count"`
 	} `toml:"gridmap"`
 
 	Logic struct {
@@ -114,6 +116,34 @@ func GetGridMapListenAddr() string {
 		return ":8083"
 	}
 	return GlobalConfig.GridMap.ListenAddr
+}
+
+func GetGridMapChunkSize() int {
+	if GlobalConfig == nil || GlobalConfig.GridMap.ChunkSize == 0 {
+		return 256
+	}
+	return GlobalConfig.GridMap.ChunkSize
+}
+
+func GetGridMapViewDistance() int {
+	if GlobalConfig == nil || GlobalConfig.GridMap.ViewDistance == 0 {
+		return 3
+	}
+	return GlobalConfig.GridMap.ViewDistance
+}
+
+func GetGridMapMapDataDir() string {
+	if GlobalConfig == nil || GlobalConfig.GridMap.MapDataDir == "" {
+		return "./data/maps"
+	}
+	return GlobalConfig.GridMap.MapDataDir
+}
+
+func GetGridMapGridCount() int {
+	if GlobalConfig == nil || GlobalConfig.GridMap.GridCount == 0 {
+		return 9
+	}
+	return GlobalConfig.GridMap.GridCount
 }
 
 func GetLogicListenAddr() string {

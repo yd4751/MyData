@@ -3,7 +3,7 @@ class MapEngine {
         this.config = Object.assign({
             chunkSize: 256,
             viewRange: 3,
-            tileSize: 32,
+            tileSize: 16,
             mapWidth: 100,
             mapHeight: 100,
             renderMode: '2d'
@@ -45,6 +45,7 @@ class MapEngine {
         });
 
         this.start();
+        this.loadInitialChunks();
     }
 
     start() {
@@ -95,13 +96,18 @@ class MapEngine {
         }
         
         this.renderer.renderGrid();
-        this.renderer.renderEntities(this.entities);
+        
+        for (const chunk of visibleChunks) {
+            this.renderer.renderChunkEntities(chunk);
+        }
         
         this.renderer.renderPlayer(this.playerWorldPos);
         
         if (this.debugMode) {
             this.renderer.renderDebug(this.fps, this.chunkManager.loadedChunks.size);
         }
+        
+        this.renderer.renderMiniMap();
     }
 
     forceRender() {
@@ -151,6 +157,7 @@ class ChunkManager {
         this.loadedChunks = new Map();
         this.pendingRequests = new Map();
         this.eventListeners = {};
+        this.loadingChunks = new Set();
     }
 
     addEventListener(event, callback) {
@@ -182,16 +189,19 @@ class ChunkManager {
         }
 
         const promise = new Promise((resolve) => {
+            this.loadingChunks.add(key);
             this.requestChunkData(chunkPos).then(chunkData => {
                 const chunk = this.createChunk(chunkPos, chunkData);
                 this.loadedChunks.set(key, chunk);
                 this.pendingRequests.delete(key);
+                this.loadingChunks.delete(key);
                 this.dispatchEvent('chunkLoaded', { chunk });
                 resolve(chunk);
             }).catch(() => {
                 const chunk = this.createEmptyChunk(chunkPos);
                 this.loadedChunks.set(key, chunk);
                 this.pendingRequests.delete(key);
+                this.loadingChunks.delete(key);
                 resolve(chunk);
             });
         });
@@ -201,23 +211,27 @@ class ChunkManager {
     }
 
     requestChunkData(chunkPos) {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const tiles = [];
-                const size = this.engine.config.chunkSize / this.engine.config.tileSize;
-                for (let y = 0; y < size; y++) {
-                    for (let x = 0; x < size; x++) {
-                        const worldX = chunkPos.x * this.engine.config.chunkSize + x * this.engine.config.tileSize;
-                        const worldY = chunkPos.y * this.engine.config.chunkSize + y * this.engine.config.tileSize;
-                        let tileId = this.generateTileId(worldX, worldY);
-                        tiles.push(tileId);
+        return new Promise((resolve, reject) => {
+            fetch(`/api/map/chunk?x=${chunkPos.x}&y=${chunkPos.y}`)
+                .then(res => res.json())
+                .then(data => {
+                    const tiles = [];
+                    const size = this.engine.config.chunkSize / this.engine.config.tileSize;
+                    for (let y = 0; y < size; y++) {
+                        for (let x = 0; x < size; x++) {
+                            const worldX = chunkPos.x * this.engine.config.chunkSize + x * this.engine.config.tileSize;
+                            const worldY = chunkPos.y * this.engine.config.chunkSize + y * this.engine.config.tileSize;
+                            let tileId = this.generateTileId(worldX, worldY);
+                            tiles.push(tileId);
+                        }
                     }
-                }
-                
-                const entities = this.generateEntities(chunkPos);
-                
-                resolve({ tiles, entities });
-            }, Math.random() * 100 + 50);
+                    
+                    const entities = data.entities || [];
+                    
+                    resolve({ tiles, entities });
+                }).catch(() => {
+                    reject();
+                });
         });
     }
 
@@ -240,24 +254,13 @@ class ChunkManager {
         const entities = [];
         const rand = Math.random();
         
-        if (rand > 0.7) {
+        if (rand > 0.95) {
             entities.push({
                 id: Math.random().toString(36).substr(2, 9),
-                type: 'npc',
-                name: 'NPC',
-                x: chunkPos.x * this.engine.config.chunkSize + 128,
-                y: chunkPos.y * this.engine.config.chunkSize + 128,
-                z: 0
-            });
-        }
-        
-        if (rand > 0.85) {
-            entities.push({
-                id: Math.random().toString(36).substr(2, 9),
-                type: 'monster',
-                name: 'Monster',
-                x: chunkPos.x * this.engine.config.chunkSize + 64 + Math.random() * 128,
-                y: chunkPos.y * this.engine.config.chunkSize + 64 + Math.random() * 128,
+                type: 'treasure',
+                name: '宝箱',
+                x: chunkPos.x * this.engine.config.chunkSize + 100 + Math.random() * 56,
+                y: chunkPos.y * this.engine.config.chunkSize + 100 + Math.random() * 56,
                 z: 0
             });
         }
@@ -279,7 +282,7 @@ class ChunkManager {
         return {
             pos: chunkPos,
             tiles: tileMatrix,
-            entities: data.entities,
+            entities: data.entities || [],
             loaded: true,
             dirty: true
         };
@@ -399,7 +402,7 @@ class Viewport {
         this.scale = 1;
         this.targetCenterX = 0;
         this.targetCenterY = 0;
-        this.smoothFactor = 0.1;
+        this.smoothFactor = 0.15;
     }
 
     resize(width, height) {
@@ -458,6 +461,9 @@ class MapRenderer {
         this.ctx = null;
         this.canvas = null;
         this.dirtyChunks = new Set();
+        this.miniMapEnabled = true;
+        this.miniMapSize = 150;
+        this.miniMapMargin = 10;
         this.tileColors = [
             '#2d5a27',
             '#3d7a37',
@@ -503,19 +509,45 @@ class MapRenderer {
         }
     }
 
-    renderEntities(entities) {
-        for (const entity of entities) {
-            const screenPos = this.engine.viewport.worldToScreen({ x: entity.x, y: entity.y });
+    renderChunkEntities(chunk) {
+        if (!chunk.entities || chunk.entities.length === 0) return;
+
+        for (const entity of chunk.entities) {
+            let entX = entity.x || entity.pos_x || entity.PosX;
+            let entY = entity.y || entity.pos_y || entity.PosY;
+            
+            if (entity.Pos) {
+                entX = entity.Pos.X || entity.Pos.x || entX;
+                entY = entity.Pos.Y || entity.Pos.y || entY;
+            }
+            
+            const screenPos = this.engine.viewport.worldToScreen({ x: entX, y: entY });
+            
+            let entityType = entity.type || entity.EntityType;
+            if (typeof entityType === 'number') {
+                switch(entityType) {
+                    case 1: entityType = 'monster'; break;
+                    case 2: entityType = 'npc'; break;
+                    case 3: entityType = 'treasure'; break;
+                    case 4: entityType = 'portal'; break;
+                }
+            }
             
             let color = '#00d4ff';
             let size = 16;
             
-            if (entity.type === 'npc') {
+            if (entityType === 'npc') {
                 color = '#f59e0b';
                 size = 14;
-            } else if (entity.type === 'monster') {
+            } else if (entityType === 'monster') {
                 color = '#ef4444';
                 size = 12;
+            } else if (entityType === 'treasure') {
+                color = '#fbbf24';
+                size = 10;
+            } else if (entityType === 'portal') {
+                color = '#a855f7';
+                size = 16;
             }
 
             this.ctx.fillStyle = color;
@@ -529,6 +561,45 @@ class MapRenderer {
             this.ctx.arc(screenPos.x, screenPos.y, size, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.shadowBlur = 0;
+
+            const scale = this.engine.viewport.getScale();
+            
+            if (entity.type === 'monster') {
+                const healthBarWidth = 40 * scale;
+                const healthBarHeight = 6 * scale;
+                const healthBarX = screenPos.x - healthBarWidth / 2;
+                const healthBarY = screenPos.y - size - 8;
+                
+                const health = entity.health || entity.Health || 100;
+                const maxHealth = entity.max_health || entity.MaxHealth || 100;
+                const healthPercent = Math.max(0, Math.min(1, health / maxHealth));
+                
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                this.ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                
+                let healthColor = '#22c55e';
+                if (healthPercent < 0.3) {
+                    healthColor = '#ef4444';
+                } else if (healthPercent < 0.6) {
+                    healthColor = '#eab308';
+                }
+                
+                this.ctx.fillStyle = healthColor;
+                this.ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
+                
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+            }
+
+            if (entity.name) {
+                const nameOffset = entity.type === 'monster' ? size + 14 : size + 4;
+                this.ctx.font = `${10 * scale}px sans-serif`;
+                this.ctx.fillStyle = '#fff';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'bottom';
+                this.ctx.fillText(entity.name, screenPos.x, screenPos.y - nameOffset);
+            }
         }
     }
 
@@ -562,6 +633,30 @@ class MapRenderer {
         }
 
         this.renderGridLabels(startX, endX, startY, endY, scale);
+        this.renderChunkBorders(startX, endX, startY, endY, scale);
+    }
+
+    renderChunkBorders(startX, endX, startY, endY, scale) {
+        const chunkSize = this.engine.config.chunkSize;
+        
+        this.ctx.strokeStyle = 'rgba(0, 217, 255, 0.4)';
+        this.ctx.lineWidth = 2;
+
+        for (let x = startX; x <= endX; x += chunkSize) {
+            const screenX = (x - this.engine.viewport.centerX) * scale + this.canvas.width / 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX, 0);
+            this.ctx.lineTo(screenX, this.canvas.height);
+            this.ctx.stroke();
+        }
+
+        for (let y = startY; y <= endY; y += chunkSize) {
+            const screenY = (y - this.engine.viewport.centerY) * scale + this.canvas.height / 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, screenY);
+            this.ctx.lineTo(this.canvas.width, screenY);
+            this.ctx.stroke();
+        }
     }
 
     renderGridLabels(startX, endX, startY, endY, scale) {
@@ -607,17 +702,7 @@ class MapRenderer {
         
         this.ctx.fillStyle = '#22c55e';
         this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 18, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        this.ctx.fillStyle = '#86efac';
-        this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 10, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 5, 0, Math.PI * 2);
+        this.ctx.arc(screenPos.x, screenPos.y, 12, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.restore();
@@ -633,6 +718,116 @@ class MapRenderer {
         this.ctx.fillText(`Chunks: ${chunkCount}`, 10, y); y += 15;
         this.ctx.fillText(`Player: (${Math.floor(this.engine.playerWorldPos.x)}, ${Math.floor(this.engine.playerWorldPos.y)})`, 10, y); y += 15;
         this.ctx.fillText(`Viewport: (${Math.floor(this.engine.viewport.centerX)}, ${Math.floor(this.engine.viewport.centerY)})`, 10, y);
+        
+        this.ctx.restore();
+    }
+
+    renderMiniMap() {
+        if (!this.miniMapEnabled || !this.canvas || !this.ctx) return;
+        
+        const size = this.miniMapSize;
+        const margin = this.miniMapMargin;
+        const x = this.canvas.width - size - margin;
+        const y = margin;
+        
+        this.ctx.save();
+        
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(x, y, size, size);
+        
+        this.ctx.strokeStyle = '#fff';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(x, y, size, size);
+        
+        const playerPos = this.engine.playerWorldPos;
+        const chunkSize = this.engine.config.chunkSize;
+        
+        const centerChunkX = Math.floor(playerPos.x / chunkSize);
+        const centerChunkY = Math.floor(playerPos.y / chunkSize);
+        
+        const miniMapScale = size / (chunkSize * 3);
+        
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                const chunk = this.engine.chunkManager.getChunk({ x: centerChunkX + dx, y: centerChunkY + dy });
+                const chunkWorldX = (centerChunkX + dx) * chunkSize;
+                const chunkWorldY = (centerChunkY + dy) * chunkSize;
+                
+                const miniX = x + (chunkWorldX - playerPos.x + chunkSize * 1.5) * miniMapScale;
+                const miniY = y + (chunkWorldY - playerPos.y + chunkSize * 1.5) * miniMapScale;
+                const miniChunkSize = chunkSize * miniMapScale;
+                
+                if (chunk && chunk.loaded) {
+                    this.ctx.fillStyle = 'rgba(45, 90, 39, 0.6)';
+                } else {
+                    this.ctx.fillStyle = 'rgba(30, 30, 30, 0.6)';
+                }
+                this.ctx.fillRect(miniX, miniY, miniChunkSize, miniChunkSize);
+                
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                this.ctx.lineWidth = 0.5;
+                this.ctx.strokeRect(miniX, miniY, miniChunkSize, miniChunkSize);
+            }
+        }
+        
+        const playerMiniX = x + size / 2;
+        const playerMiniY = y + size / 2;
+        
+        this.ctx.fillStyle = '#22c55e';
+        this.ctx.beginPath();
+        this.ctx.arc(playerMiniX, playerMiniY, 4, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                const chunk = this.engine.chunkManager.getChunk({ x: centerChunkX + dx, y: centerChunkY + dy });
+                if (!chunk || !chunk.entities) continue;
+                
+                for (const entity of chunk.entities) {
+                    let entType = entity.type || entity.EntityType;
+                    if (typeof entType === 'number') {
+                        switch(entType) {
+                            case 1: entType = 'monster'; break;
+                            case 2: entType = 'npc'; break;
+                            case 3: entType = 'treasure'; break;
+                        }
+                    }
+                    
+                    if (entType !== 'monster') continue;
+                    
+                    let entX = entity.x || entity.pos_x || entity.PosX;
+                    let entY = entity.y || entity.pos_y || entity.PosY;
+                    if (entity.Pos) {
+                        entX = entity.Pos.X || entity.Pos.x || entX;
+                        entY = entity.Pos.Y || entity.Pos.y || entY;
+                    }
+                    const entityMiniX = x + (entX - playerPos.x + chunkSize * 1.5) * miniMapScale;
+                    const entityMiniY = y + (entY - playerPos.y + chunkSize * 1.5) * miniMapScale;
+                    
+                    this.ctx.fillStyle = '#ef4444';
+                    this.ctx.beginPath();
+                    this.ctx.arc(entityMiniX, entityMiniY, 2.5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+        }
+        
+        const viewportHalfWidth = (this.canvas.width / 2) / this.engine.viewport.getScale();
+        const viewportHalfHeight = (this.canvas.height / 2) / this.engine.viewport.getScale();
+        
+        const viewportMiniX = x + (-viewportHalfWidth + chunkSize * 1.5) * miniMapScale;
+        const viewportMiniY = y + (-viewportHalfHeight + chunkSize * 1.5) * miniMapScale;
+        const viewportMiniWidth = (viewportHalfWidth * 2) * miniMapScale;
+        const viewportMiniHeight = (viewportHalfHeight * 2) * miniMapScale;
+        
+        this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.6)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(viewportMiniX, viewportMiniY, viewportMiniWidth, viewportMiniHeight);
+        
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = '10px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('小地图', x + size / 2, y + size + 15);
         
         this.ctx.restore();
     }

@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -374,4 +375,53 @@ func (p *Player) AddGold(amount int64) {
 
 func (p *Player) RemoveGold(amount int64) error {
 	return p.Inventory.RemoveGold(amount)
+}
+
+func CalculateExpForLevel(level int32) int64 {
+	return int64(100 * math.Pow(1.5, float64(level-1)))
+}
+
+func (p *Player) AddExp(exp int64) (bool, int32) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.Exp += exp
+	oldLevel := p.Level
+	leveledUp := false
+	newLevel := oldLevel
+
+	for {
+		requiredExp := CalculateExpForLevel(p.Level)
+		if p.Exp >= requiredExp {
+			p.Exp -= requiredExp
+			p.Level++
+			newLevel = p.Level
+			p.MaxHealth += 20
+			p.Health = p.MaxHealth
+			p.MaxMana += 10
+			p.Mana = p.MaxMana
+			p.Strength += 2
+			p.Agility += 2
+			p.Intelligence += 2
+			p.Defense += 1
+			leveledUp = true
+		} else {
+			break
+		}
+	}
+
+	return leveledUp, newLevel - oldLevel
+}
+
+func (p *Player) GetExp() int64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.Exp
+}
+
+func (p *Player) GetExpProgress() float64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	required := CalculateExpForLevel(p.Level)
+	return float64(p.Exp) / float64(required)
 }

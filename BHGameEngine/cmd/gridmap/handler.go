@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"math"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/openworld-server/internal/ai"
+	"github.com/openworld-server/internal/battlecore"
 	"github.com/openworld-server/internal/cluster"
 	"github.com/openworld-server/internal/connector"
 	"github.com/openworld-server/internal/entity"
@@ -14,7 +17,9 @@ import (
 	"github.com/openworld-server/internal/network"
 	"github.com/openworld-server/internal/player"
 	"github.com/openworld-server/internal/worldmap"
+	"github.com/openworld-server/pkg/config"
 	"github.com/openworld-server/pkg/logger"
+	"github.com/openworld-server/pkg/snowflake"
 )
 
 type GridMapHandler struct {
@@ -32,14 +37,19 @@ type GridMapHandler struct {
 }
 
 func NewGridMapHandler(cluster *cluster.Cluster, gridID int) *GridMapHandler {
+	chunkSize := config.GetGridMapChunkSize()
+	viewDistance := config.GetGridMapViewDistance()
+	gridCount := config.GetGridMapGridCount()
+	mapDataDir := config.GetGridMapMapDataDir()
+
 	return &GridMapHandler{
 		cluster:     cluster,
-		worldMap:    worldmap.NewWorldMap(256, 3),
+		worldMap:    worldmap.NewWorldMap(float64(chunkSize), viewDistance),
 		entityMgr:   entity.NewEntityManager(),
 		playerMgr:   player.NewPlayerManager(),
 		aiManager:   ai.NewAIManager(),
-		gridRouter:  worldmap.NewGridMapRouter(cluster, 9),
-		mapLoader:   worldmap.NewMapLoader("./data/maps"),
+		gridRouter:  worldmap.NewGridMapRouter(cluster, gridCount),
+		mapLoader:   worldmap.NewMapLoader(mapDataDir),
 		gridID:      gridID,
 		playerConns: make(map[int64]net.Conn),
 		connector:   connector.NewConnector(cluster),
@@ -86,6 +96,8 @@ func (h *GridMapHandler) handlePlayerEnter(msgObj *network.Message) {
 	h.playerConns[req.PlayerID] = msgObj.Session
 	h.mu.Unlock()
 
+	h.spawnMonstersNearPlayer(req.PlayerID, player.Pos)
+
 	logger.Info("Player entered gridmap ", h.gridID, ": ", req.PlayerID, " at (", req.PosX, ",", req.PosY, ")")
 
 	resp := msg.MapPlayerEnterResponse{
@@ -93,6 +105,69 @@ func (h *GridMapHandler) handlePlayerEnter(msgObj *network.Message) {
 		Message: "success",
 	}
 	h.sendResponse(msgObj.Session, msg.MSG_MAP_PLAYER_ENTER, &resp)
+}
+
+func (h *GridMapHandler) spawnMonstersNearPlayer(playerID int64, playerPos worldmap.Vec3) {
+	h.updateMonstersAroundPlayer(playerPos)
+}
+
+func (h *GridMapHandler) updateMonstersAroundPlayer(playerPos worldmap.Vec3) {
+	monsters := h.entityMgr.GetAllMonsters()
+	nearbyCount := 0
+
+	for _, m := range monsters {
+		mPos := m.GetPosition()
+		dist := math.Sqrt(
+			math.Pow(playerPos.X-mPos.X, 2) +
+				math.Pow(playerPos.Y-mPos.Y, 2),
+		)
+		if dist < 300 {
+			nearbyCount++
+		}
+	}
+
+	rand.Seed(time.Now().UnixNano())
+
+	if nearbyCount < 5 && rand.Float64() < 0.3 {
+		spawnCount := rand.Intn(3) + 1
+		spawnCount = min(spawnCount, 10-nearbyCount)
+
+		if spawnCount > 0 {
+			h.actuallySpawnMonsters(playerPos, spawnCount)
+		}
+	}
+}
+
+func (h *GridMapHandler) actuallySpawnMonsters(playerPos worldmap.Vec3, count int) {
+	monsterNames := []string{"史莱姆", "哥布林", "蝙蝠", "骷髅", "狼"}
+
+	for i := 0; i < count; i++ {
+		angle := rand.Float64() * math.Pi * 2
+		dist := 50 + rand.Float64()*250
+
+		monsterPos := worldmap.Vec3{
+			X: playerPos.X + math.Cos(angle)*dist,
+			Y: playerPos.Y + math.Sin(angle)*dist,
+			Z: 0,
+		}
+
+		monsterID := snowflake.GenerateID()
+		name := monsterNames[rand.Intn(len(monsterNames))]
+		level := int32(1 + rand.Intn(3))
+
+		h.entityMgr.CreateMonster(monsterID, name, monsterPos, level)
+		h.worldMap.AddEntity(h.worldMap.WorldPosToChunk(monsterPos), monsterID, nil)
+		h.aiManager.AddBehavior(monsterID, ai.AITypeAggressive, monsterPos)
+
+		logger.Info("Spawned monster ", name, " (ID: ", monsterID, ") at (", monsterPos.X, ",", monsterPos.Y, ")")
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (h *GridMapHandler) handlePlayerLeave(msgObj *network.Message) {
@@ -142,6 +217,8 @@ func (h *GridMapHandler) handlePlayerMove(msgObj *network.Message) {
 	h.playerMgr.UpdatePosition(req.PlayerID, newPos)
 	h.worldMap.UpdatePlayerPosition(req.PlayerID, newPos)
 
+	h.checkMonsterCollision(req.PlayerID, newPos)
+
 	h.syncNearbyPlayers(req.PlayerID, newPos)
 
 	resp := msg.MapPlayerMoveResponse{
@@ -149,6 +226,85 @@ func (h *GridMapHandler) handlePlayerMove(msgObj *network.Message) {
 		Message: "success",
 	}
 	h.sendResponse(msgObj.Session, msg.MSG_MAP_PLAYER_MOVE, &resp)
+}
+
+func (h *GridMapHandler) checkMonsterCollision(playerID int64, playerPos worldmap.Vec3) {
+	nearbyEntities := h.entityMgr.GetEntitiesInRadius(playerPos, 20)
+
+	for _, ent := range nearbyEntities {
+		if ent.Type != entity.EntityTypeMonster {
+			continue
+		}
+
+		monster, ok := h.entityMgr.GetMonster(ent.ID)
+		if !ok {
+			continue
+		}
+
+		if monster.GetState() == entity.EntityStateDead {
+			continue
+		}
+
+		monsterPos := monster.GetPosition()
+		distance := math.Sqrt(
+			math.Pow(playerPos.X-monsterPos.X, 2) +
+				math.Pow(playerPos.Y-monsterPos.Y, 2) +
+				math.Pow(playerPos.Z-monsterPos.Z, 2),
+		)
+
+		if distance < 15 {
+			logger.Info("Player ", playerID, " collided with monster ", monster.ID)
+			h.triggerBattle(playerID, monster.ID)
+			break
+		}
+	}
+}
+
+func (h *GridMapHandler) triggerBattle(playerID int64, monsterID int64) {
+	p, ok := h.playerMgr.GetPlayer(playerID)
+	if !ok {
+		return
+	}
+
+	m, ok := h.entityMgr.GetMonster(monsterID)
+	if !ok {
+		return
+	}
+
+	battleID := snowflake.GenerateID()
+	battle := battlecore.GetBattleManager().CreateBattle(battleID)
+	battle.AddPlayer(p)
+	battle.AddMonster(m)
+
+	logger.Info("Battle triggered: battleID=", battleID, ", playerID=", playerID, ", monsterID=", monsterID)
+
+	playerState := p.GetState()
+	if playerState != player.StateCombat {
+		h.playerMgr.UpdateState(playerID, player.StateCombat)
+	}
+
+	h.entityMgr.UpdateState(monsterID, entity.EntityStateAttacking)
+
+	h.notifyBattleStart(playerID, battleID)
+}
+
+func (h *GridMapHandler) notifyBattleStart(playerID int64, battleID int64) {
+	h.mu.RLock()
+	conn, ok := h.playerConns[playerID]
+	h.mu.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	response := map[string]interface{}{
+		"result":    0,
+		"message":   "battle_start",
+		"battle_id": battleID,
+	}
+
+	data, _ := json.Marshal(response)
+	network.SendRawMessage(conn, 4007, msg.NodeTypeGridMap, data)
 }
 
 func (h *GridMapHandler) handleCrossGridInternal(playerID int64, newPos worldmap.Vec3) {
@@ -300,6 +456,21 @@ func (h *GridMapHandler) handleChunkLoad(msgObj *network.Message) {
 
 	entities := make([]*msg.EntityInfo, 0)
 	for _, entityData := range chunkData.Entities {
+		var health, maxHealth int32
+
+		if entityData.EntityType == 1 {
+			monster, exists := h.entityMgr.GetMonster(entityData.EntityID)
+			if !exists {
+				monster = h.entityMgr.CreateMonster(entityData.EntityID, entityData.Name,
+					worldmap.Vec3{X: entityData.Pos.X, Y: entityData.Pos.Y, Z: entityData.Pos.Z},
+					1)
+				h.worldMap.AddEntity(chunkPos, entityData.EntityID, nil)
+				h.aiManager.AddBehavior(entityData.EntityID, ai.AITypeAggressive, entityData.Pos)
+			}
+			health = monster.Health
+			maxHealth = monster.MaxHealth
+		}
+
 		entities = append(entities, &msg.EntityInfo{
 			EntityID:   entityData.EntityID,
 			EntityType: entityData.EntityType,
@@ -308,6 +479,8 @@ func (h *GridMapHandler) handleChunkLoad(msgObj *network.Message) {
 			PosY:       entityData.Pos.Y,
 			PosZ:       entityData.Pos.Z,
 			Rotation:   entityData.Rotation,
+			Health:     health,
+			MaxHealth:  maxHealth,
 		})
 	}
 
@@ -436,5 +609,50 @@ func (h *GridMapHandler) updateAI() {
 				h.aiManager.ClearTarget(monster.ID)
 			}
 		}
+	}
+
+	h.despawnMonstersOutOfView()
+}
+
+func (h *GridMapHandler) despawnMonstersOutOfView() {
+	monsters := h.entityMgr.GetAllMonsters()
+	allPlayers := h.playerMgr.GetAllPlayers()
+
+	if len(allPlayers) == 0 {
+		for _, monster := range monsters {
+			h.entityMgr.RemoveEntity(monster.ID)
+			h.aiManager.RemoveBehavior(monster.ID)
+			logger.Info("Despawned monster ", monster.ID, " (no players online)")
+		}
+		return
+	}
+
+	for _, monster := range monsters {
+		monsterPos := monster.GetPosition()
+		inView := false
+
+		for _, player := range allPlayers {
+			playerPos := player.GetPosition()
+			dist := math.Sqrt(
+				math.Pow(playerPos.X-monsterPos.X, 2) +
+					math.Pow(playerPos.Y-monsterPos.Y, 2),
+			)
+
+			if dist <= 300 {
+				inView = true
+				break
+			}
+		}
+
+		if !inView {
+			h.entityMgr.RemoveEntity(monster.ID)
+			h.aiManager.RemoveBehavior(monster.ID)
+			logger.Info("Despawned monster ", monster.ID, " (out of view)")
+		}
+	}
+
+	if len(allPlayers) > 0 {
+		playerPos := allPlayers[0].GetPosition()
+		h.updateMonstersAroundPlayer(playerPos)
 	}
 }

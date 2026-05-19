@@ -17,6 +17,8 @@ listen_addr = ":7062"
 chunk_size = 256
 view_distance = 3
 max_players_per_chunk = 100
+map_data_dir = "./data/maps"
+grid_count = 9
 
 [logic]
 listen_addr = ":7063"

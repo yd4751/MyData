@@ -143,16 +143,51 @@ func (h *BattleHandler) handleSkill(msgObj *network.Message) {
 
 	if battle.CheckBattleEnd() {
 		rewards := battle.GetRewards()
+		levelUpInfo := h.processBattleRewards(battle, rewards)
 		h.battleManager.EndBattle(req.BattleID)
 
 		battleEndResponse := map[string]interface{}{
-			"result":    0,
-			"message":   "battle ended",
-			"battle_id": req.BattleID,
-			"rewards":   rewards,
+			"result":      0,
+			"message":     "battle ended",
+			"battle_id":   req.BattleID,
+			"rewards":     rewards,
+			"level_up":    levelUpInfo.leveledUp,
+			"level_count": levelUpInfo.levelCount,
+			"new_level":   levelUpInfo.newLevel,
 		}
 		h.sendResponse(msgObj.Session, msg.MSG_BATTLE_END_RES, battleEndResponse)
 	}
+}
+
+type LevelUpInfo struct {
+	leveledUp  bool
+	levelCount int32
+	newLevel   int32
+}
+
+func (h *BattleHandler) processBattleRewards(battle *battlecore.Battle, rewards map[int64]int64) LevelUpInfo {
+	info := LevelUpInfo{
+		leveledUp:  false,
+		levelCount: 0,
+		newLevel:   0,
+	}
+
+	for playerID, exp := range rewards {
+		player, ok := battle.GetPlayer(playerID)
+		if !ok {
+			continue
+		}
+
+		leveledUp, levelCount := player.AddExp(exp)
+		if leveledUp {
+			info.leveledUp = true
+			info.levelCount += levelCount
+			info.newLevel = player.GetLevel()
+			log.Info("Player ", playerID, " leveled up! New level: ", info.newLevel, ", Total levels gained: ", info.levelCount)
+		}
+	}
+
+	return info
 }
 
 func (h *BattleHandler) handleBattleEnd(msgObj *network.Message) {

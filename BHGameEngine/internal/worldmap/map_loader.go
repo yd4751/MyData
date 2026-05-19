@@ -3,9 +3,12 @@ package worldmap
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
+	"time"
 
+	"github.com/openworld-server/pkg/snowflake"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,6 +63,10 @@ func (l *MapLoader) LoadChunk(chunkPos ChunkPos) (*MapChunkData, error) {
 		return nil, err
 	}
 
+	if chunkData.Entities == nil || len(chunkData.Entities) == 0 {
+		l.generateEntities(chunkData)
+	}
+
 	l.mu.Lock()
 	l.loadedChunks[chunkPos] = chunkData
 	l.mu.Unlock()
@@ -74,7 +81,7 @@ func (l *MapLoader) loadChunkFromFile(chunkPos ChunkPos) (*MapChunkData, error) 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		logrus.Warn("Failed to load chunk file, generating default: ", err)
-		return l.generateDefaultChunk(chunkPos), nil
+		return l.GenerateDefaultChunk(chunkPos), nil
 	}
 
 	var chunkData MapChunkData
@@ -91,7 +98,7 @@ func (l *MapLoader) getChunkFilePath(chunkPos ChunkPos) string {
 	return l.mapDataDir + "/chunk_" + fmt.Sprintf("%d_%d", chunkPos.X, chunkPos.Y) + ".json"
 }
 
-func (l *MapLoader) generateDefaultChunk(chunkPos ChunkPos) *MapChunkData {
+func (l *MapLoader) GenerateDefaultChunk(chunkPos ChunkPos) *MapChunkData {
 	chunk := &MapChunkData{
 		ChunkPos: chunkPos,
 		Version:  1,
@@ -108,7 +115,75 @@ func (l *MapLoader) generateDefaultChunk(chunkPos ChunkPos) *MapChunkData {
 		}
 	}
 
+	l.generateEntities(chunk)
+
 	return chunk
+}
+
+func (l *MapLoader) generateEntities(chunk *MapChunkData) {
+	rand.Seed(time.Now().UnixNano() + int64(chunk.ChunkPos.X)*1000 + int64(chunk.ChunkPos.Y))
+
+	entities := make([]MapEntityData, 0)
+
+	if rand.Float64() > 0.7 {
+		entities = append(entities, MapEntityData{
+			EntityID:   snowflake.GenerateID(),
+			EntityType: 2,
+			Name:       "守卫",
+			Pos: Vec3{
+				X: float64(chunk.ChunkPos.X*ChunkSize) + 128 + rand.Float64()*64,
+				Y: float64(chunk.ChunkPos.Y*ChunkSize) + 128 + rand.Float64()*64,
+				Z: 0,
+			},
+			Rotation: 0,
+		})
+	}
+
+	if rand.Float64() > 0.3 {
+		entities = append(entities, MapEntityData{
+			EntityID:   snowflake.GenerateID(),
+			EntityType: 1,
+			Name:       "史莱姆",
+			Pos: Vec3{
+				X: float64(chunk.ChunkPos.X*ChunkSize) + 64 + rand.Float64()*128,
+				Y: float64(chunk.ChunkPos.Y*ChunkSize) + 64 + rand.Float64()*128,
+				Z: 0,
+			},
+			Rotation: 0,
+		})
+	}
+
+	if rand.Float64() > 0.5 {
+		entities = append(entities, MapEntityData{
+			EntityID:   snowflake.GenerateID(),
+			EntityType: 1,
+			Name:       "哥布林",
+			Pos: Vec3{
+				X: float64(chunk.ChunkPos.X*ChunkSize) + 100 + rand.Float64()*56,
+				Y: float64(chunk.ChunkPos.Y*ChunkSize) + 100 + rand.Float64()*56,
+				Z: 0,
+			},
+			Rotation: 0,
+		})
+	}
+
+	if rand.Float64() > 0.6 {
+		monsterNames := []string{"蝙蝠", "骷髅", "狼"}
+		name := monsterNames[rand.Intn(len(monsterNames))]
+		entities = append(entities, MapEntityData{
+			EntityID:   snowflake.GenerateID(),
+			EntityType: 1,
+			Name:       name,
+			Pos: Vec3{
+				X: float64(chunk.ChunkPos.X*ChunkSize) + 80 + rand.Float64()*96,
+				Y: float64(chunk.ChunkPos.Y*ChunkSize) + 80 + rand.Float64()*96,
+				Z: 0,
+			},
+			Rotation: 0,
+		})
+	}
+
+	chunk.Entities = entities
 }
 
 func (l *MapLoader) UnloadChunk(chunkPos ChunkPos) {
