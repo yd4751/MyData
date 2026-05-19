@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MediaStation - 探索自然之美</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <span class="logo-icon">▶</span>
+            <span class="logo-text">MediaStation</span>
+        </div>
+        <nav class="nav">
+            <a href="#home" class="nav-item active">首页</a>
+            <a href="#category" class="nav-item">分类</a>
+            <a href="#profile" class="nav-item">我的</a>
+        </nav>
+        <button class="search-btn" id="searchBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+            </svg>
+        </button>
+    </header>
+
+    <main class="main">
+        <section id="home" class="section active">
+            <div class="hero-banner">
+                <div class="hero-content">
+                    <h1 class="hero-title">探索自然之美</h1>
+                    <button class="play-btn" id="playHeroBtn">
+                        <span class="play-icon">▶</span>
+                    </button>
+                </div>
+                <div class="hero-overlay"></div>
+            </div>
+
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">精彩视频</h2>
+                    <a href="#" class="see-more">查看更多</a>
+                </div>
+                <div class="video-scroll" id="videoScroll">
+                    <div class="video-list" id="videoList"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="category" class="section">
+            <div class="category-page">
+                <h2 class="page-title">视频分类</h2>
+                <div class="category-list">
+                    <div class="category-item" data-type="video">
+                        <div class="category-icon">🎬</div>
+                        <span>视频</span>
+                    </div>
+                    <div class="category-item" data-type="image">
+                        <div class="category-icon">🖼️</div>
+                        <span>图片</span>
+                    </div>
+                    <div class="category-item" data-type="audio">
+                        <div class="category-icon">🎵</div>
+                        <span>音乐</span>
+                    </div>
+                    <div class="category-item" data-type="novel">
+                        <div class="category-icon">📝</div>
+                        <span>文本</span>
+                    </div>
+                </div>
+                <div class="category-videos">
+                    <h3 class="section-title">推荐内容</h3>
+                    <div class="media-grid" id="categoryMediaGrid"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="profile" class="section">
+            <div class="profile-page">
+                <div class="profile-header">
+                    <div class="avatar">
+                        <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                            <circle cx="30" cy="30" r="28" stroke="#fff" stroke-width="2"/>
+                            <circle cx="30" cy="26" r="9" fill="#fff"/>
+                            <path d="M19 45 Q30 56 41 45" stroke="#fff" stroke-width="2" fill="none"/>
+                        </svg>
+                    </div>
+                    <div class="user-info">
+                        <h2 class="username">用户昵称</h2>
+                        <p class="watch-time">观看时长: 120小时</p>
+                    </div>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">128</span>
+                        <span class="stat-label">收藏</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">5</span>
+                        <span class="stat-label">上传</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">1.2k</span>
+                        <span class="stat-label">获赞</span>
+                    </div>
+                </div>
+
+                <div class="profile-tabs">
+                    <button class="tab-btn active" data-tab="history">观看历史</button>
+                    <button class="tab-btn" data-tab="favorites">我的收藏</button>
+                </div>
+
+                <div class="profile-content">
+                    <div class="tab-content active" id="historyContent">
+                        <div class="history-list" id="historyList"></div>
+                    </div>
+                    <div class="tab-content" id="favoritesContent">
+                        <div class="video-grid" id="favoritesGrid"></div>
+                    </div>
+                </div>
+
+                <button class="upload-btn" id="uploadBtn">
+                    <span class="upload-icon">+</span>
+                    <span>上传媒体</span>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <div class="bottom-nav">
+        <a href="#home" class="nav-item active">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">首页</span>
+        </a>
+        <a href="#category" class="nav-item">
+            <span class="nav-icon">📁</span>
+            <span class="nav-label">分类</span>
+        </a>
+        <a href="#profile" class="nav-item">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">我的</span>
+        </a>
+    </div>
+
+    <div id="playerModal" class="modal">
+        <div class="modal-content player-modal">
+            <div class="modal-header">
+                <button class="back-btn" id="backBtn">←</button>
+                <h3 class="modal-title">精彩视频</h3>
+            </div>
+            <div class="player-wrapper">
+                <video id="videoPlayer" controls playsinline></video>
+            </div>
+            <div class="player-info">
+                <div class="continue-watching">
+                    <h4>继续观看</h4>
+                    <div class="continue-item" id="continueItem"></div>
+                </div>
+                <div class="related-videos">
+                    <h4>相关推荐</h4>
+                    <div class="related-list" id="relatedList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="searchModal" class="modal">
+        <div class="modal-content search-modal">
+            <div class="search-input-container">
+                <input type="text" id="searchInput" placeholder="搜索视频...">
+                <button id="searchSubmitBtn">搜索</button>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+        </div>
+    </div>
+
+    <div id="uploadModal" class="modal">
+        <div class="modal-content upload-modal">
+            <div class="modal-header">
+                <button class="back-btn" id="uploadBackBtn">←</button>
+                <h3 class="modal-title">上传媒体文件</h3>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" id="uploadFile" name="file" accept="*" required>
+                </div>
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="uploadTitle" name="title" placeholder="自动从文件名提取">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="uploadDescription" name="description" placeholder="添加描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="uploadType" name="type">
+                        <option value="">自动检测</option>
+                        <option value="video">视频</option>
+                        <option value="image">图片</option>
+                        <option value="novel">文本</option>
+                    </select>
+                </div>
+                <div class="upload-progress">
+                    <div class="progress-bar" id="uploadProgress"></div>
+                    <span id="uploadStatus"></span>
+                </div>
+                <button type="submit" class="submit-btn">上传</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

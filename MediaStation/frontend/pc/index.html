@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaStation - 探索自然之美</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <span class="logo-icon">▶</span>
+            <span class="logo-text">MediaStation</span>
+        </div>
+        <nav class="nav">
+            <a href="#home" class="nav-item active">首页</a>
+            <a href="#category" class="nav-item">分类</a>
+            <a href="#profile" class="nav-item">我的</a>
+        </nav>
+        <button class="search-btn" id="searchBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+            </svg>
+        </button>
+    </header>
+
+    <main class="main">
+        <section id="home" class="section active">
+            <div class="hero-banner">
+                <div class="hero-content">
+                    <h1 class="hero-title">探索自然之美</h1>
+                    <button class="play-btn" id="playHeroBtn">
+                        <span class="play-icon">▶</span>
+                    </button>
+                </div>
+                <div class="hero-overlay"></div>
+            </div>
+
+            <div class="content-section">
+                <h2 class="section-title">精彩视频</h2>
+                <div class="video-grid" id="videoGrid"></div>
+            </div>
+        </section>
+
+        <section id="category" class="section">
+            <div class="category-container">
+                <h2 class="section-title">媒体分类</h2>
+                <div class="category-grid">
+                    <div class="category-card" data-type="video">
+                        <div class="category-icon">🎬</div>
+                        <span class="category-name">视频</span>
+                    </div>
+                    <div class="category-card" data-type="image">
+                        <div class="category-icon">🖼️</div>
+                        <span class="category-name">图片</span>
+                    </div>
+                    <div class="category-card" data-type="audio">
+                        <div class="category-icon">🎵</div>
+                        <span class="category-name">音乐</span>
+                    </div>
+                    <div class="category-card" data-type="novel">
+                        <div class="category-icon">📝</div>
+                        <span class="category-name">文本</span>
+                    </div>
+                </div>
+                <div class="category-content">
+                    <div class="media-grid" id="categoryMediaGrid"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="profile" class="section">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="avatar">
+                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="38" stroke="#fff" stroke-width="2"/>
+                            <circle cx="40" cy="35" r="12" fill="#fff"/>
+                            <path d="M25 60 Q40 75 55 60" stroke="#fff" stroke-width="3" fill="none"/>
+                        </svg>
+                    </div>
+                    <div class="user-info">
+                        <h2 class="username">用户昵称</h2>
+                        <p class="watch-time">观看时长: 120小时</p>
+                    </div>
+                </div>
+                <div class="profile-tabs">
+                    <button class="tab-btn active" data-tab="history">观看历史</button>
+                    <button class="tab-btn" data-tab="favorites">我的收藏</button>
+                    <button class="tab-btn" data-tab="uploads">上传视频</button>
+                </div>
+                <div class="profile-content">
+                    <div class="tab-content active" id="historyContent">
+                        <div class="video-grid" id="historyGrid"></div>
+                    </div>
+                    <div class="tab-content" id="favoritesContent">
+                        <div class="video-grid" id="favoritesGrid"></div>
+                    </div>
+                    <div class="tab-content" id="uploadsContent">
+                        <button class="upload-btn" id="uploadBtn">
+                            <span class="upload-icon">+</span>
+                            <span>上传媒体</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="player-container">
+                <video id="videoPlayer" controls></video>
+                <div class="player-controls">
+                    <button id="playPauseBtn">▶</button>
+                    <input type="range" id="progressBar" min="0" max="100" value="0">
+                    <span id="timeDisplay">00:00 / 00:00</span>
+                    <select id="playbackSpeed">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                    <button id="fullscreenBtn">⛶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="searchModal" class="modal">
+        <div class="modal-content search-modal">
+            <div class="search-input-container">
+                <input type="text" id="searchInput" placeholder="搜索视频...">
+                <button id="searchSubmitBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+        </div>
+    </div>
+
+    <div id="uploadModal" class="modal">
+        <div class="modal-content upload-modal">
+            <span class="close">&times;</span>
+            <h3>上传媒体文件</h3>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" id="uploadFile" name="file" accept="*" required>
+                </div>
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="uploadTitle" name="title" placeholder="自动从文件名提取">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="uploadDescription" name="description" placeholder="添加描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="uploadType" name="type">
+                        <option value="">自动检测</option>
+                        <option value="video">视频</option>
+                        <option value="image">图片</option>
+                        <option value="novel">文本</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>系列ID（可选）</label>
+                    <input type="number" id="uploadSeriesId" name="series_id" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>季（可选）</label>
+                    <input type="number" id="uploadSeason" name="season" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>集（可选）</label>
+                    <input type="number" id="uploadEpisode" name="episode" placeholder="0">
+                </div>
+                <div class="upload-progress">
+                    <div class="progress-bar" id="uploadProgress"></div>
+                    <span id="uploadStatus"></span>
+                </div>
+                <button type="submit" class="submit-btn">上传</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
