@@ -2,6 +2,7 @@ package item
 
 import (
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -243,5 +244,5 @@ func (inv *Inventory) GetGold() int64 {
 }
 
 func generateUID() string {
-	return time.Now().Format("20060102150405") + "_" + string(rune(time.Now().UnixNano()%10000))
+	return time.Now().Format("20060102150405") + "_" + strconv.FormatInt(time.Now().UnixNano()%10000, 10)
 }

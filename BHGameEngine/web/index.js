@@ -519,20 +519,41 @@ function useSkill(skillId) {
         if (monsterHealth <= 0) endBattle(true);
     }
     updatePlayerStats();
-    sendMessage(MSG.SKILL_REQ, { battle_id: battleID, player_id: playerID, skill_id: skillId, target_id: currentTarget || 0 });
+    if (connected && playerID > 0) {
+        sendMessage(MSG.SKILL_REQ, { battle_id: battleID, player_id: playerID, skill_id: skillId, target_id: currentTarget || 0 });
+    }
 }
 
 function playSkillEffect(skillId, skill) {
     const battleUI = document.getElementById('battleUI');
-    if (!battleUI || battleUI.classList.contains('hidden')) return;
-    const playerPos = { x: 60, y: 30 };
-    const monsterPos = { x: 700, y: 30 };
+    const isBattleVisible = battleUI && !battleUI.classList.contains('hidden');
+    
+    let playerPos, monsterPos;
+    if (isBattleVisible) {
+        playerPos = { x: 60, y: 30 };
+        monsterPos = { x: 700, y: 30 };
+    } else {
+        const playerMarker = document.getElementById('playerMarker');
+        if (playerMarker && playerMarker.style.display !== 'none') {
+            const rect = playerMarker.getBoundingClientRect();
+            playerPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        } else {
+            playerPos = { x: window.innerWidth / 2 - 30, y: window.innerHeight / 2 - 30 };
+        }
+        monsterPos = { x: playerPos.x + 100, y: playerPos.y };
+    }
+    
     createSkillEffect(playerPos.x, playerPos.y, skill.effectType);
-    if (skill.projectile && skillId < 100 && isInBattle) {
+    
+    if (skill.projectile && skillId < 100) {
+        if (isSkillOnCooldown(skillId)) return;
         createProjectile(playerPos.x, playerPos.y, monsterPos.x, monsterPos.y, skill.effectType);
         setTimeout(() => createSkillEffect(monsterPos.x, monsterPos.y, skill.effectType), 400);
     }
-    if (skillId === 100) createSkillEffect(playerPos.x, playerPos.y, skill.effectType);
+    
+    if (skillId === 100) {
+        createSkillEffect(playerPos.x, playerPos.y, skill.effectType);
+    }
 }
 
 function createSkillEffect(x, y, effectType) {
@@ -722,7 +743,7 @@ function useItem(slot) {
     const config = itemConfigs[item.itemID];
     if (!config) { console.error('物品配置不存在:', item.itemID); return; }
     if (config.type !== 1) { addChatMessage('system', '[系统] 该物品不能使用'); return; }
-    sendMessage(MSG.ITEM_USE_REQ, { player_id: playerID, session_id: sessionID, position: slot });
+    sendMessage(MSG.ITEM_USE_REQ, { player_id: playerID, session_id: sessionID, item_id: item.itemID, position: slot });
 }
 
 function handleItemUseResponse(data) {

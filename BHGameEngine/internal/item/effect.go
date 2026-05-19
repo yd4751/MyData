@@ -20,7 +20,10 @@ type EffectContext struct {
 }
 
 func UseItem(inv *Inventory, slot int32, ctx *EffectContext) (bool, error) {
-	item, ok := inv.GetItem(slot)
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+
+	item, ok := inv.Items[slot]
 	if !ok {
 		return false, errors.New("item not found")
 	}
@@ -34,12 +37,16 @@ func UseItem(inv *Inventory, slot int32, ctx *EffectContext) (bool, error) {
 		return false, errors.New("item is not consumable")
 	}
 
-	if inv.IsOnCooldown(item.ItemID) {
+	cooldown, ok := inv.Cooldowns[item.ItemID]
+	if ok && cooldown.EndTime > time.Now().Unix() {
 		return false, errors.New("item is on cooldown")
 	}
 
 	if config.Cooldown > 0 {
-		inv.SetCooldown(item.ItemID, config.Cooldown)
+		inv.Cooldowns[item.ItemID] = &CooldownEntry{
+			ItemID:  item.ItemID,
+			EndTime: time.Now().Unix() + int64(config.Cooldown),
+		}
 	}
 
 	err := applyEffect(config, ctx)
@@ -47,9 +54,9 @@ func UseItem(inv *Inventory, slot int32, ctx *EffectContext) (bool, error) {
 		return false, err
 	}
 
-	err = inv.RemoveItem(slot, 1)
-	if err != nil {
-		return false, err
+	item.Count -= 1
+	if item.Count <= 0 {
+		delete(inv.Items, slot)
 	}
 
 	return true, nil
@@ -105,6 +112,8 @@ func applyEffect(config *ItemConfig, ctx *EffectContext) error {
 		if config.Duration > 0 {
 			go removeDefenseAfterDelay(ctx.Defense, config.EffectValue, config.Duration)
 		}
+	case EffectTempBuff:
+		return applyTempBuff(config, ctx)
 	default:
 		return errors.New("unknown effect type")
 	}
@@ -130,4 +139,32 @@ func removeIntelligenceAfterDelay(intelligence *int32, value int32, duration int
 func removeDefenseAfterDelay(defense *int32, value int32, duration int32) {
 	time.Sleep(time.Duration(duration) * time.Second)
 	*defense -= value
+}
+
+func applyTempBuff(config *ItemConfig, ctx *EffectContext) error {
+	if ctx.Strength != nil {
+		*ctx.Strength += config.EffectValue
+		if config.Duration > 0 {
+			go removeStrengthAfterDelay(ctx.Strength, config.EffectValue, config.Duration)
+		}
+	}
+	if ctx.Agility != nil {
+		*ctx.Agility += config.EffectValue
+		if config.Duration > 0 {
+			go removeAgilityAfterDelay(ctx.Agility, config.EffectValue, config.Duration)
+		}
+	}
+	if ctx.Intelligence != nil {
+		*ctx.Intelligence += config.EffectValue
+		if config.Duration > 0 {
+			go removeIntelligenceAfterDelay(ctx.Intelligence, config.EffectValue, config.Duration)
+		}
+	}
+	if ctx.Defense != nil {
+		*ctx.Defense += config.EffectValue
+		if config.Duration > 0 {
+			go removeDefenseAfterDelay(ctx.Defense, config.EffectValue, config.Duration)
+		}
+	}
+	return nil
 }

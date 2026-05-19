@@ -101,14 +101,14 @@
             <div class="skills-panel">
                 <div class="panel-title">技能</div>
                 <div class="skills-grid">
-                    <div class="skill-item" onclick="useSkill(1)"><div class="skill-icon">⚔️</div><div class="skill-name">普攻</div></div>
-                    <div class="skill-item" onclick="useSkill(2)"><div class="skill-icon">🔥</div><div class="skill-name">火球术</div></div>
-                    <div class="skill-item" onclick="useSkill(3)"><div class="skill-icon">❄️</div><div class="skill-name">冰霜箭</div></div>
-                    <div class="skill-item" onclick="useSkill(4)"><div class="skill-icon">⚡</div><div class="skill-name">闪电链</div></div>
-                    <div class="skill-item" onclick="useSkill(100)"><div class="skill-icon">💚</div><div class="skill-name">治疗</div></div>
-                    <div class="skill-item" onclick="useSkill(101)"><div class="skill-icon">🛡️</div><div class="skill-name">护盾</div></div>
-                    <div class="skill-item" onclick="useSkill(102)"><div class="skill-icon">🏃</div><div class="skill-name">加速</div></div>
-                    <div class="skill-item" onclick="useSkill(103)"><div class="skill-icon">✨</div><div class="skill-name">瞬移</div></div>
+                    <div class="skill-item" data-skill-id="1" onclick="useSkill(1)"><div class="skill-icon">⚔️</div><div class="skill-name">普攻</div></div>
+                    <div class="skill-item" data-skill-id="2" onclick="useSkill(2)"><div class="skill-icon">🔥</div><div class="skill-name">火球术</div></div>
+                    <div class="skill-item" data-skill-id="3" onclick="useSkill(3)"><div class="skill-icon">❄️</div><div class="skill-name">冰霜箭</div></div>
+                    <div class="skill-item" data-skill-id="4" onclick="useSkill(4)"><div class="skill-icon">⚡</div><div class="skill-name">闪电链</div></div>
+                    <div class="skill-item" data-skill-id="100" onclick="useSkill(100)"><div class="skill-icon">💚</div><div class="skill-name">治疗</div></div>
+                    <div class="skill-item" data-skill-id="101" onclick="useSkill(101)"><div class="skill-icon">🛡️</div><div class="skill-name">护盾</div></div>
+                    <div class="skill-item" data-skill-id="102" onclick="useSkill(102)"><div class="skill-icon">🏃</div><div class="skill-name">加速</div></div>
+                    <div class="skill-item" data-skill-id="103" onclick="useSkill(103)"><div class="skill-icon">✨</div><div class="skill-name">瞬移</div></div>
                 </div>
             </div>
             
@@ -255,7 +255,7 @@
         </div>
     </div>
 
-    <script src="index.js"></script>
+    <script type="module" src="index.js"></script>
     <script src="js/skillEffects.js"></script>
     <script src="js/skillCooldown.js"></script>
 </body>
