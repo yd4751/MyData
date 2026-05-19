@@ -589,10 +589,13 @@ func (b *Battle) CheckBattleEnd() bool {
 func (b *Battle) GetRewards() map[int64]int64 {
 	rewards := make(map[int64]int64)
 	b.mu.RLock()
-	for _, m := range b.Monsters {
-		if m.GetState() == entity.EntityStateDead {
+	for _, monster := range b.Monsters {
+		isDead := monster.GetState() == entity.EntityStateDead
+		expReward := monster.ExpReward
+
+		if isDead {
 			for playerID := range b.Players {
-				rewards[playerID] += m.ExpReward
+				rewards[playerID] += expReward
 			}
 		}
 	}

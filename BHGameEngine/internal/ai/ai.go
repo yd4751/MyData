@@ -230,8 +230,8 @@ func (m *AIManager) updateChase(behavior *AIBehavior) {
 }
 
 func (m *AIManager) updateReturn(behavior *AIBehavior) {
-	dx := behavior.HomePos.X - behavior.HomePos.X
-	dy := behavior.HomePos.Y - behavior.HomePos.Y
+	dx := behavior.TargetPos.X - behavior.HomePos.X
+	dy := behavior.TargetPos.Y - behavior.HomePos.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
 
 	if dist < 1 {

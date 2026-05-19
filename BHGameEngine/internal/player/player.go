@@ -26,7 +26,8 @@ type Player struct {
 	State        PlayerState       // 玩家状态
 	ChunkPos     worldmap.ChunkPos // 所在地图区块位置
 	TeamID       int64             // 队伍ID，0表示无队伍
-	Buffs        []*Buff           // 增益/减益效果列表
+	Buffs        []*Buff           // 增益/减益效果列表（旧版）
+	BuffEffects  []*BuffEffect     // 技能效果列表（新版）
 	Inventory    *item.Inventory   // 背包系统
 	Strength     int32             // 力量属性（影响物理攻击）
 	Agility      int32             // 敏捷属性（影响攻速、闪避、暴击）
@@ -52,6 +53,17 @@ type Buff struct {
 	Name    string
 	Stacks  int32
 	EndTime int64
+}
+
+type BuffEffect struct {
+	EffectID   int64
+	EffectType int32
+	Value      float32
+	Duration   int
+	StackCount int
+	MaxStacks  int
+	StartTime  int64
+	IsDebuff   bool
 }
 
 type PlayerManager struct {
@@ -84,6 +96,7 @@ func (m *PlayerManager) CreatePlayer(id int64, name string, accountID int64) *Pl
 		MaxStamina:   100,
 		State:        StateIdle,
 		Buffs:        make([]*Buff, 0),
+		BuffEffects:  make([]*BuffEffect, 0),
 		Inventory:    item.NewInventory(id),
 		Strength:     10,
 		Agility:      10,
@@ -217,6 +230,86 @@ func (p *Player) TakeDamage(damage int32) {
 		p.State = StateDead
 	}
 	p.mu.Unlock()
+}
+
+func (p *Player) GetDefense() int32 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.Defense
+}
+
+func (p *Player) IsDead() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.State == StateDead
+}
+
+func (p *Player) AddBuffEffect(buff *BuffEffect) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, existing := range p.BuffEffects {
+		if existing.EffectID == buff.EffectID {
+			if existing.StackCount < existing.MaxStacks {
+				existing.StackCount++
+			}
+			existing.StartTime = buff.StartTime
+			existing.Duration = buff.Duration
+			return
+		}
+	}
+
+	p.BuffEffects = append(p.BuffEffects, buff)
+}
+
+func (p *Player) RemoveBuffEffect(effectID int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for i, buff := range p.BuffEffects {
+		if buff.EffectID == effectID {
+			p.BuffEffects = append(p.BuffEffects[:i], p.BuffEffects[i+1:]...)
+			break
+		}
+	}
+}
+
+func (p *Player) HasBuffEffect(effectID int64) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for _, buff := range p.BuffEffects {
+		if buff.EffectID == effectID {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Player) GetBuffEffectStacks(effectID int64) int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for _, buff := range p.BuffEffects {
+		if buff.EffectID == effectID {
+			return buff.StackCount
+		}
+	}
+	return 0
+}
+
+func (p *Player) UpdateBuffEffects() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	now := time.Now().UnixNano() / 1e6
+	newEffects := make([]*BuffEffect, 0)
+	for _, buff := range p.BuffEffects {
+		if buff.StartTime+int64(buff.Duration) > now {
+			newEffects = append(newEffects, buff)
+		}
+	}
+	p.BuffEffects = newEffects
 }
 
 func (p *Player) Heal(amount int32) {
@@ -424,4 +517,40 @@ func (p *Player) GetExpProgress() float64 {
 	defer p.mu.RUnlock()
 	required := CalculateExpForLevel(p.Level)
 	return float64(p.Exp) / float64(required)
+}
+
+func (p *Player) SetPosition(pos worldmap.Vec3) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Pos = pos
+}
+
+func (p *Player) SetRotation(rotation float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Rotation = rotation
+}
+
+func (p *Player) SetLevel(level int32) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Level = level
+}
+
+func (p *Player) SetHealth(health int32) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Health = health
+}
+
+func (p *Player) SetMaxHealth(maxHealth int32) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.MaxHealth = maxHealth
+}
+
+func (p *Player) SetChunkPos(chunkPos worldmap.ChunkPos) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.ChunkPos = chunkPos
 }

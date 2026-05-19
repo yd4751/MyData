@@ -1,0 +1,313 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0f; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        /* 登录界面 */
+        .login-screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); display: flex; align-items: center; justify-content: center; }
+        .login-panel { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; width: 360px; border: 1px solid rgba(255,255,255,0.1); }
+        .login-title { text-align: center; font-size: 28px; margin-bottom: 30px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .login-form { display: flex; flex-direction: column; gap: 15px; }
+        .login-input { padding: 12px 15px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.05); color: #fff; font-size: 14px; outline: none; transition: border-color 0.3s; }
+        .login-input:focus { border-color: #00d4ff; }
+        .login-btn { padding: 12px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.3s; }
+        .login-btn:hover { opacity: 0.9; }
+        .login-switch { text-align: center; margin-top: 20px; color: #888; font-size: 13px; cursor: pointer; }
+        .login-switch:hover { color: #00d4ff; }
+        .hidden { display: none !important; }
+        
+        /* 游戏主界面 */
+        .game-ui { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* 主容器 */
+        .container { display: flex; flex: 1; overflow: hidden; }
+        
+        /* 左侧面板 */
+        .left-panel { width: 280px; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; }
+        
+        /* 玩家信息 */
+        .player-info { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .player-name { font-size: 18px; font-weight: 600; }
+        .player-level { color: #f59e0b; font-size: 14px; }
+        .status-bars { display: flex; flex-direction: column; gap: 10px; }
+        .status-bar { display: flex; align-items: center; gap: 10px; }
+        .status-label { width: 50px; font-size: 12px; color: #888; }
+        .status-fill-container { height: 12px; border-radius: 6px; flex: 1; background: rgba(255,255,255,0.1); overflow: hidden; }
+        .status-fill { height: 100%; border-radius: 6px; transition: width 0.3s ease; }
+        .health-fill { background: linear-gradient(90deg, #ef4444, #f97316); }
+        .mana-fill { background: linear-gradient(90deg, #3b82f6, #8b5cf6); }
+        .stamina-fill { background: linear-gradient(90deg, #22c55e, #84cc16); }
+        .status-value { font-size: 12px; color: #aaa; }
+        
+        /* 技能特效 */
+        .skill-effect {
+            position: absolute;
+            pointer-events: none;
+            z-index: 100;
+            border-radius: 50%;
+            animation: skillEffect 0.6s ease-out forwards;
+        }
+        
+        .skill-effect-fire {
+            background: radial-gradient(circle, #ff6b35 0%, #f7931e 40%, #ff4500 70%, transparent 100%);
+            box-shadow: 0 0 30px #ff6b35, 0 0 60px #f7931e;
+        }
+        
+        .skill-effect-ice {
+            background: radial-gradient(circle, #00d4ff 0%, #3b82f6 40%, #1e40af 70%, transparent 100%);
+            box-shadow: 0 0 30px #00d4ff, 0 0 60px #3b82f6;
+        }
+        
+        .skill-effect-lightning {
+            background: radial-gradient(circle, #fbbf24 0%, #facc15 40%, #eab308 70%, transparent 100%);
+            box-shadow: 0 0 30px #fbbf24, 0 0 60px #facc15;
+        }
+        
+        .skill-effect-heal {
+            background: radial-gradient(circle, #22c55e 0%, #16a34a 40%, #15803d 70%, transparent 100%);
+            box-shadow: 0 0 30px #22c55e, 0 0 60px #16a34a;
+        }
+        
+        .skill-effect-shield {
+            background: radial-gradient(circle, #8b5cf6 0%, #6366f1 40%, #4f46e5 70%, transparent 100%);
+            box-shadow: 0 0 30px #8b5cf6, 0 0 60px #6366f1;
+        }
+        
+        .skill-effect-normal {
+            background: radial-gradient(circle, #9ca3af 0%, #6b7280 40%, #4b5563 70%, transparent 100%);
+            box-shadow: 0 0 20px #9ca3af;
+        }
+        
+        @keyframes skillEffect {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.5);
+                opacity: 0;
+            }
+        }
+        
+        /* 技能弹道 */
+        .skill-projectile {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 99;
+            animation: projectileMove 0.4s linear forwards;
+        }
+        
+        .projectile-fire {
+            background: #ff6b35;
+            box-shadow: 0 0 15px #ff6b35;
+        }
+        
+        .projectile-ice {
+            background: #00d4ff;
+            box-shadow: 0 0 15px #00d4ff;
+        }
+        
+        .projectile-lightning {
+            background: #fbbf24;
+            box-shadow: 0 0 15px #fbbf24;
+        }
+        
+        @keyframes projectileMove {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0.5;
+                transform: scale(0.5);
+            }
+        }
+        
+        /* 伤害数字 */
+        .damage-number {
+            position: absolute;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 101;
+            animation: damageFloat 1s ease-out forwards;
+        }
+        
+        .damage-number.damage {
+            color: #ef4444;
+            text-shadow: 0 0 10px #ef4444;
+        }
+        
+        .damage-number.heal {
+            color: #22c55e;
+            text-shadow: 0 0 10px #22c55e;
+        }
+        
+        @keyframes damageFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) scale(1.2);
+            }
+        }
+        
+        /* 属性面板 */
+        .stats-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .panel-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #aaa; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 18px; font-weight: 600; color: #00d4ff; }
+        .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+        
+        /* 状态面板 */
+        .status-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .status-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; text-align: center; }
+        .status-value { font-size: 14px; font-weight: 600; color: #f59e0b; }
+        .status-label { font-size: 10px; color: #888; margin-top: 2px; }
+        
+        /* 装备栏 */
+        .equipment-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .equipment-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .equip-slot { aspect-ratio: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .equip-slot:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        .equip-icon { font-size: 18px; }
+        .equip-slot-name { font-size: 8px; color: #888; margin-bottom: 2px; }
+        
+        /* 技能面板 */
+        .skills-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .skills-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .skill-item { aspect-ratio: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .skill-item:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        .skill-icon { font-size: 20px; margin-bottom: 4px; }
+        .skill-name { font-size: 10px; color: #aaa; }
+        
+        /* 队伍面板 */
+        .party-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .party-list { display: flex; flex-direction: column; gap: 8px; }
+        .party-member { display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; }
+        .party-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #00d4ff, #7b2cbf); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .party-info { flex: 1; }
+        .party-name { font-size: 12px; }
+        .party-status { font-size: 10px; color: #22c55e; }
+        
+        /* 右侧面板 */
+        .right-panel { width: 250px; background: rgba(255,255,255,0.03); border-left: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; }
+        
+        /* 顶部状态栏 */
+        .header { height: 60px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; padding: 0 20px; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .status-dot.online { background: #22c55e; }
+        .status-dot.offline { background: #ef4444; }
+        .server-status { font-size: 12px; color: #888; }
+        .btn { padding: 8px 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .btn:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        
+        /* 主游戏区域 */
+        .main-area { flex: 1; display: flex; flex-direction: column; background: #0d0d14; }
+        
+        /* 地图区域 */
+        .map-area { flex: 1; position: relative; overflow: hidden; }
+        .map-canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        .map-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
+        .player-marker { position: absolute; width: 32px; height: 32px; background: #00d4ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(0,212,255,0.5); pointer-events: none; }
+        
+        .coordinate-display { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; font-size: 11px; pointer-events: none; }
+        #worldCoord { color: #00d4ff; margin-bottom: 2px; }
+        #localCoord { color: #22c55e; margin-bottom: 2px; }
+        #chunkCoord { color: #f59e0b; }
+        
+        /* 控制区域 */
+        .control-area { height: 80px; background: rgba(255,255,255,0.03); border-top: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; gap: 20px; }
+        .direction-btn { width: 50px; height: 50px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: all 0.2s; }
+        .direction-btn:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        
+        /* 背包面板 */
+        .inventory-panel { padding: 15px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .inventory-item { aspect-ratio: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .inventory-item:hover { background: rgba(0,212,255,0.2); }
+        .item-icon { font-size: 24px; }
+        .item-count { font-size: 10px; color: #f59e0b; margin-top: 2px; }
+        .gold-display { padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center; margin-bottom: 15px; }
+        .gold-value { font-size: 18px; font-weight: 600; color: #f59e0b; }
+        
+        /* 任务面板 */
+        .quests-panel { padding: 15px; flex: 1; overflow-y: auto; }
+        .quest-item { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+        .quest-item:hover { background: rgba(0,212,255,0.1); }
+        .quest-title { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+        .quest-desc { font-size: 11px; color: #888; margin-bottom: 8px; }
+        .quest-progress { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 5px; }
+        .quest-progress-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #7b2cbf); }
+        .quest-status { font-size: 10px; color: #22c55e; }
+        
+        /* 聊天区域 */
+        .chat-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .chat-messages { height: 120px; overflow-y: auto; margin-bottom: 10px; }
+        .chat-message { font-size: 12px; margin-bottom: 5px; }
+        .chat-message.player { color: #00d4ff; }
+        .chat-message.npc { color: #f59e0b; }
+        .chat-message.system { color: #888; }
+        .chat-input { width: 100%; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; font-size: 12px; outline: none; }
+        
+        /* NPC对话框 */
+        .npc-dialog { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; width: 500px; border: 1px solid rgba(255,255,255,0.2); }
+        .dialog-npc-name { font-size: 16px; font-weight: 600; color: #f59e0b; margin-bottom: 10px; }
+        .dialog-text { font-size: 14px; margin-bottom: 15px; line-height: 1.5; }
+        .dialog-options { display: flex; flex-direction: column; gap: 8px; }
+        .dialog-option { padding: 10px 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; font-size: 13px; text-align: left; transition: all 0.2s; }
+        .dialog-option:hover { background: rgba(0,212,255,0.2); border-color: #00d4ff; }
+        
+        /* 战斗界面 */
+        .battle-ui { position: absolute; bottom: 20px; left: 20px; right: 20px; }
+        .battle-entity { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .entity-avatar { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .entity-info { flex: 1; }
+        .entity-name { font-size: 16px; font-weight: 600; }
+        .battle-health-bar { height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        .battle-health-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); transition: width 0.3s; }
+        .battle-health-fill.danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .entity-health { font-size: 14px; color: #888; }
+        .battle-log { height: 100px; overflow-y: auto; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px; margin-top: 15px; }
+        .battle-log-entry { font-size: 12px; margin-bottom: 5px; }
+        .battle-log-damage { color: #ef4444; }
+        .battle-log-heal { color: #22c55e; }
+        .battle-log-skill { color: #8b5cf6; }
+        
+        /* 调试面板 */
+        .debug-panel { padding: 10px; background: rgba(0,0,0,0.5); font-family: monospace; font-size: 11px; color: #888; }
+        .debug-line { margin-bottom: 4px; }
+        
+        /* Tooltip按钮 */
+        .tooltip-btn { padding: 6px 12px; background: rgba(0,212,255,0.2); border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .tooltip-btn:hover { background: rgba(0,212,255,0.4); }
+        
+        /* 设置面板 */
+        .settings-panel { padding: 15px; }
+        .settings-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .settings-label { font-size: 13px; }
+        .settings-toggle { width: 40px; height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; cursor: pointer; position: relative; }
+        .settings-toggle.active { background: #00d4ff; }
+        .toggle-dot { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: left 0.3s; }
+        .settings-toggle.active .toggle-dot { left: 22px; }
+        
+        /* 附近怪物列表 */
+        .monsters-panel { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .monster-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+        .monster-item:hover { background: rgba(239,68,68,0.2); }
+        .monster-name { font-size: 13px; }
+        .monster-level { font-size: 11px; color: #f59e0b; }
