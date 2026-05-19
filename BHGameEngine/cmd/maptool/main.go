@@ -12,7 +12,7 @@ import (
 
 var configPath = flag.String("config", "./config/config.toml", "config file path")
 var mapDataDir = flag.String("mapdir", "./data/maps", "map data directory")
-var action = flag.String("action", "", "action: generate, info, edit, entity, save")
+var action = flag.String("action", "", "action: generate, fullmap, info, edit, entity, save, list")
 var chunkX = flag.Int("chunkx", 0, "chunk X coordinate")
 var chunkY = flag.Int("chunky", 0, "chunk Y coordinate")
 var tileX = flag.Int("tilex", 0, "tile X coordinate")
@@ -28,6 +28,8 @@ var posX = flag.Float64("posx", 0, "position X")
 var posY = flag.Float64("posy", 0, "position Y")
 var posZ = flag.Float64("posz", 0, "position Z")
 var radius = flag.Int("radius", 1, "radius for generation")
+var width = flag.Int("width", 10, "width for full map generation")
+var heightChunks = flag.Int("heightchunks", 10, "height for full map generation")
 
 func main() {
 	flag.Parse()
@@ -50,6 +52,8 @@ func main() {
 	switch *action {
 	case "generate":
 		generateChunks(mapLoader, *chunkX, *chunkY, *radius)
+	case "fullmap":
+		generateFullMap(mapLoader, *width, *heightChunks)
 	case "info":
 		showChunkInfo(mapLoader, *chunkX, *chunkY)
 	case "edit":
@@ -72,7 +76,8 @@ func printUsage() {
 	fmt.Println("  maptool -action=<action> [options]")
 	fmt.Println("")
 	fmt.Println("Actions:")
-	fmt.Println("  generate   - Generate map chunks")
+	fmt.Println("  generate   - Generate map chunks around center")
+	fmt.Println("  fullmap    - Generate full map with specified dimensions")
 	fmt.Println("  info       - Show chunk information")
 	fmt.Println("  edit       - Edit tile properties")
 	fmt.Println("  entity     - Add entity to chunk")
@@ -85,6 +90,8 @@ func printUsage() {
 	fmt.Println("  -chunkx=<int>     Chunk X coordinate")
 	fmt.Println("  -chunky=<int>     Chunk Y coordinate")
 	fmt.Println("  -radius=<int>     Radius for generation (default: 1)")
+	fmt.Println("  -width=<int>      Width for full map generation (default: 10)")
+	fmt.Println("  -heightchunks=<int> Height for full map generation (default: 10)")
 	fmt.Println("  -tilex=<int>      Tile X coordinate (0-255)")
 	fmt.Println("  -tiley=<int>      Tile Y coordinate (0-255)")
 	fmt.Println("  -tileid=<int>     Tile ID")
@@ -100,9 +107,38 @@ func printUsage() {
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  maptool -action=generate -chunkx=0 -chunky=0 -radius=3")
+	fmt.Println("  maptool -action=fullmap -width=20 -heightchunks=20")
 	fmt.Println("  maptool -action=info -chunkx=0 -chunky=0")
 	fmt.Println("  maptool -action=edit -chunkx=0 -chunky=0 -tilex=10 -tiley=10 -tileid=5 -terrain=2 -walkable=true")
 	fmt.Println("  maptool -action=entity -chunkx=0 -chunky=0 -entityid=1001 -entitytype=1 -entityname=Monster -posx=128 -posy=128")
+}
+
+func generateFullMap(loader *worldmap.MapLoader, width, height int) {
+	fmt.Printf("Generating full map of size %dx%d chunks...\n", width, height)
+
+	halfWidth := width / 2
+	halfHeight := height / 2
+
+	totalChunks := width * height
+	generated := 0
+
+	for y := -halfHeight; y < halfHeight; y++ {
+		for x := -halfWidth; x < halfWidth; x++ {
+			chunkPos := worldmap.ChunkPos{X: x, Y: y}
+			chunk := loader.GenerateDefaultChunk(chunkPos)
+			err := loader.SaveChunk(chunk)
+			if err != nil {
+				fmt.Printf("Failed to save chunk (%d,%d): %v\n", chunkPos.X, chunkPos.Y, err)
+			} else {
+				generated++
+				if generated%10 == 0 {
+					fmt.Printf("Generated %d/%d chunks...\n", generated, totalChunks)
+				}
+			}
+		}
+	}
+
+	fmt.Printf("Generation complete! Generated %d/%d chunks.\n", generated, totalChunks)
 }
 
 func generateChunks(loader *worldmap.MapLoader, centerX, centerY, radius int) {

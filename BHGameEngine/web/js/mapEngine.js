@@ -3,9 +3,7 @@ class MapEngine {
         this.config = Object.assign({
             chunkSize: 256,
             viewRange: 3,
-            tileSize: 16,
-            mapWidth: 100,
-            mapHeight: 100,
+            tileSize: 32,
             renderMode: '2d'
         }, config);
 
@@ -18,9 +16,8 @@ class MapEngine {
         this.fps = 0;
         this.fpsUpdateTime = 0;
         
-        this.playerWorldPos = { x: 0, y: 0, z: 0 };
-        this.entities = [];
-        this.loadingChunks = new Set();
+        this.playerWorldPos = { x: 512, y: 512, z: 0 };
+        this.debugMode = false;
         
         this.onChunkLoaded = this.onChunkLoaded.bind(this);
         this.chunkManager.addEventListener('chunkLoaded', this.onChunkLoaded);
@@ -91,8 +88,12 @@ class MapEngine {
         
         this.renderer.clear();
         
-        for (const chunk of visibleChunks) {
-            this.renderer.renderChunk(chunk);
+        if (visibleChunks.length === 0) {
+            this.renderer.renderEmptyMap();
+        } else {
+            for (const chunk of visibleChunks) {
+                this.renderer.renderChunk(chunk);
+            }
         }
         
         this.renderer.renderGrid();
@@ -107,7 +108,7 @@ class MapEngine {
             this.renderer.renderDebug(this.fps, this.chunkManager.loadedChunks.size);
         }
         
-        this.renderer.renderMiniMap();
+        this.renderer.renderMiniMap(this.playerWorldPos);
     }
 
     forceRender() {
@@ -157,7 +158,6 @@ class ChunkManager {
         this.loadedChunks = new Map();
         this.pendingRequests = new Map();
         this.eventListeners = {};
-        this.loadingChunks = new Set();
     }
 
     addEventListener(event, callback) {
@@ -189,19 +189,16 @@ class ChunkManager {
         }
 
         const promise = new Promise((resolve) => {
-            this.loadingChunks.add(key);
             this.requestChunkData(chunkPos).then(chunkData => {
                 const chunk = this.createChunk(chunkPos, chunkData);
                 this.loadedChunks.set(key, chunk);
                 this.pendingRequests.delete(key);
-                this.loadingChunks.delete(key);
                 this.dispatchEvent('chunkLoaded', { chunk });
                 resolve(chunk);
             }).catch(() => {
                 const chunk = this.createEmptyChunk(chunkPos);
                 this.loadedChunks.set(key, chunk);
                 this.pendingRequests.delete(key);
-                this.loadingChunks.delete(key);
                 resolve(chunk);
             });
         });
@@ -213,59 +210,82 @@ class ChunkManager {
     requestChunkData(chunkPos) {
         return new Promise((resolve, reject) => {
             fetch(`/api/map/chunk?x=${chunkPos.x}&y=${chunkPos.y}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
                 .then(data => {
                     const tiles = [];
                     const size = this.engine.config.chunkSize / this.engine.config.tileSize;
-                    for (let y = 0; y < size; y++) {
-                        for (let x = 0; x < size; x++) {
-                            const worldX = chunkPos.x * this.engine.config.chunkSize + x * this.engine.config.tileSize;
-                            const worldY = chunkPos.y * this.engine.config.chunkSize + y * this.engine.config.tileSize;
-                            let tileId = this.generateTileId(worldX, worldY);
-                            tiles.push(tileId);
+                    
+                    if (data.tiles && data.tiles.length > 0) {
+                        if (Array.isArray(data.tiles[0])) {
+                            for (let y = 0; y < size; y++) {
+                                for (let x = 0; x < size; x++) {
+                                    if (data.tiles[y] && data.tiles[y][x]) {
+                                        const tileData = data.tiles[y][x];
+                                        tiles.push(typeof tileData === 'object' ? (tileData.Terrain || tileData.terrain || 0) : tileData);
+                                    } else {
+                                        tiles.push(0);
+                                    }
+                                }
+                            }
+                        } else {
+                            for (let i = 0; i < size * size; i++) {
+                                const tileData = data.tiles[i];
+                                tiles.push(typeof tileData === 'object' ? (tileData.Terrain || tileData.terrain || 0) : (tileData || 0));
+                            }
+                        }
+                    } else {
+                        for (let y = 0; y < size; y++) {
+                            for (let x = 0; x < size; x++) {
+                                const worldX = chunkPos.x * this.engine.config.chunkSize + x * this.engine.config.tileSize;
+                                const worldY = chunkPos.y * this.engine.config.chunkSize + y * this.engine.config.tileSize;
+                                let tileId = this.generateTileId(worldX, worldY);
+                                tiles.push(tileId);
+                            }
                         }
                     }
                     
                     const entities = data.entities || [];
+                    const processedEntities = entities.map(e => ({
+                        id: e.EntityID || e.id || Math.random().toString(36).substr(2, 9),
+                        type: e.EntityType || e.type || 1,
+                        name: e.Name || e.name || 'Unknown',
+                        x: e.Pos ? (e.Pos.X || e.Pos.x) : (e.pos_x || e.x || 0),
+                        y: e.Pos ? (e.Pos.Y || e.Pos.y) : (e.pos_y || e.y || 0),
+                        z: e.Pos ? (e.Pos.Z || e.Pos.z) : (e.pos_z || e.z || 0),
+                        Health: e.Properties ? e.Properties.Health : (e.health || 100),
+                        MaxHealth: e.Properties ? e.Properties.MaxHealth : (e.max_health || 100)
+                    }));
                     
-                    resolve({ tiles, entities });
-                }).catch(() => {
-                    reject();
+                    console.log(`[ChunkManager] Loaded chunk ${chunkPos.x},${chunkPos.y}: ${tiles.length} tiles, ${processedEntities.length} entities`);
+                    resolve({ tiles, entities: processedEntities });
+                }).catch(err => {
+                    console.log(`[ChunkManager] Failed to load chunk ${chunkPos.x},${chunkPos.y}, using fallback:`, err.message);
+                    reject(err);
                 });
         });
     }
 
     generateTileId(x, y) {
         const noise = this.simplexNoise(x / 200, y / 200);
+        const noise2 = this.simplexNoise(x / 150 + 100, y / 150 + 100);
         
-        if (noise > 0.7) return 2;
-        if (noise > 0.5) return 1;
-        if (noise > 0.3) return 3;
-        if (noise > 0.1) return 0;
-        return 4;
+        if (noise > 0.85) return 7;
+        if (noise > 0.75) return 6;
+        if (noise < 0.2) return 5;
+        if (noise < 0.25) return 4;
+        if (noise < 0.3) return 3;
+        if (noise2 > 0.7) return 9;
+        if (noise2 > 0.55) return 1;
+        if (noise2 < 0.25) return 2;
+        return 0;
     }
 
     simplexNoise(x, y) {
         const n = Math.sin(x * 0.05) * 0.5 + Math.cos(y * 0.07) * 0.3 + Math.sin((x + y) * 0.03) * 0.2;
         return (n + 1) / 2;
-    }
-
-    generateEntities(chunkPos) {
-        const entities = [];
-        const rand = Math.random();
-        
-        if (rand > 0.95) {
-            entities.push({
-                id: Math.random().toString(36).substr(2, 9),
-                type: 'treasure',
-                name: '宝箱',
-                x: chunkPos.x * this.engine.config.chunkSize + 100 + Math.random() * 56,
-                y: chunkPos.y * this.engine.config.chunkSize + 100 + Math.random() * 56,
-                z: 0
-            });
-        }
-        
-        return entities;
     }
 
     createChunk(chunkPos, data) {
@@ -295,7 +315,10 @@ class ChunkManager {
         for (let y = 0; y < size; y++) {
             tileMatrix[y] = [];
             for (let x = 0; x < size; x++) {
-                tileMatrix[y][x] = 0;
+                const worldX = chunkPos.x * this.engine.config.chunkSize + x * this.engine.config.tileSize;
+                const worldY = chunkPos.y * this.engine.config.chunkSize + y * this.engine.config.tileSize;
+                let tileId = this.generateTileId(worldX, worldY);
+                tileMatrix[y][x] = tileId;
             }
         }
         
@@ -304,7 +327,7 @@ class ChunkManager {
             tiles: tileMatrix,
             entities: [],
             loaded: true,
-            dirty: false
+            dirty: true
         };
     }
 
@@ -366,11 +389,18 @@ class ChunkManager {
         const centerChunk = this.worldToChunk(worldPos);
         const range = this.engine.config.viewRange;
         
+        const chunkPromises = [];
         for (let dx = -range; dx <= range; dx++) {
             for (let dy = -range; dy <= range; dy++) {
-                this.loadChunk({ x: centerChunk.x + dx, y: centerChunk.y + dy });
+                chunkPromises.push(this.loadChunk({ x: centerChunk.x + dx, y: centerChunk.y + dy }));
             }
         }
+        
+        Promise.all(chunkPromises).then(() => {
+            console.log('[ChunkManager] All initial chunks loaded');
+        }).catch(() => {
+            console.log('[ChunkManager] Some chunks failed to load');
+        });
     }
 
     worldToChunk(worldPos) {
@@ -446,10 +476,6 @@ class Viewport {
         };
     }
 
-    setScale(scale) {
-        this.scale = Math.max(0.5, Math.min(3, scale));
-    }
-
     getScale() {
         return this.scale;
     }
@@ -460,16 +486,20 @@ class MapRenderer {
         this.engine = engine;
         this.ctx = null;
         this.canvas = null;
-        this.dirtyChunks = new Set();
         this.miniMapEnabled = true;
         this.miniMapSize = 150;
         this.miniMapMargin = 10;
-        this.tileColors = [
-            '#2d5a27',
-            '#3d7a37',
-            '#4a90d9',
-            '#8b7355',
-            '#c4a35a'
+        this.tileTypes = [
+            { name: 'grass', color: '#3d7a37', icon: '🌿' },
+            { name: 'forest', color: '#1e4d23', icon: '🌲' },
+            { name: 'dirt', color: '#8b7355', icon: '🪨' },
+            { name: 'sand', color: '#f4d03f', icon: '🏜️' },
+            { name: 'water', color: '#3498db', icon: '🌊' },
+            { name: 'deep_water', color: '#2c3e50', icon: '🌊' },
+            { name: 'mountain', color: '#95a5a6', icon: '⛰️' },
+            { name: 'snow', color: '#ecf0f1', icon: '❄️' },
+            { name: 'lava', color: '#e74c3c', icon: '🔥' },
+            { name: 'swamp', color: '#27ae60', icon: '🟩' }
         ];
         this.gridSpacing = 64;
     }
@@ -491,22 +521,78 @@ class MapRenderer {
         const chunkSize = this.engine.config.chunkSize;
         const tilesPerChunk = chunkSize / this.engine.config.tileSize;
 
-        if (chunk.dirty) {
-            for (let ty = 0; ty < tilesPerChunk; ty++) {
-                for (let tx = 0; tx < tilesPerChunk; tx++) {
-                    const tileId = chunk.tiles[ty][tx];
-                    const x = screenPos.x + tx * tileSize;
-                    const y = screenPos.y + ty * tileSize;
+        for (let ty = 0; ty < tilesPerChunk; ty++) {
+            for (let tx = 0; tx < tilesPerChunk; tx++) {
+                const tileId = chunk.tiles[ty][tx];
+                const x = screenPos.x + tx * tileSize;
+                const y = screenPos.y + ty * tileSize;
 
-                    this.ctx.fillStyle = this.tileColors[tileId] || '#333';
-                    this.ctx.fillRect(x, y, tileSize, tileSize);
-
-                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                    this.ctx.strokeRect(x, y, tileSize, tileSize);
-                }
+                this.renderTile(x, y, tileSize, tileId);
             }
-            chunk.dirty = false;
         }
+    }
+
+    renderTile(x, y, size, tileId) {
+        this.ctx.fillStyle = '#1a1a2e';
+        this.ctx.fillRect(x, y, size, size);
+        
+        const tile = this.tileTypes[tileId];
+        if (!tile) return;
+        
+        this.ctx.fillStyle = tile.color;
+        this.ctx.font = `${size * 0.7}px serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(tile.icon, x + size / 2, y + size / 2);
+        
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        this.ctx.lineWidth = 0.5;
+        this.ctx.strokeRect(x, y, size, size);
+    }
+
+    renderEmptyMap() {
+        const scale = this.engine.viewport.getScale();
+        const tileSize = this.engine.config.tileSize * scale;
+        const visible = this.engine.viewport.getVisibleRect();
+        
+        const startTileX = Math.floor(visible.left / this.engine.config.tileSize);
+        const endTileX = Math.ceil(visible.right / this.engine.config.tileSize);
+        const startTileY = Math.floor(visible.top / this.engine.config.tileSize);
+        const endTileY = Math.ceil(visible.bottom / this.engine.config.tileSize);
+
+        for (let ty = startTileY; ty <= endTileY; ty++) {
+            for (let tx = startTileX; tx <= endTileX; tx++) {
+                const worldX = tx * this.engine.config.tileSize;
+                const worldY = ty * this.engine.config.tileSize;
+                const screenPos = this.engine.viewport.worldToScreen({ x: worldX, y: worldY });
+                
+                if (screenPos.x + tileSize < 0 || screenPos.x > this.canvas.width ||
+                    screenPos.y + tileSize < 0 || screenPos.y > this.canvas.height) {
+                    continue;
+                }
+                
+                const noise = this.simplexNoise(worldX / 200, worldY / 200);
+                const noise2 = this.simplexNoise(worldX / 150 + 100, worldY / 150 + 100);
+                
+                let tileId;
+                if (noise > 0.85) tileId = 7;
+                else if (noise > 0.75) tileId = 6;
+                else if (noise < 0.2) tileId = 5;
+                else if (noise < 0.25) tileId = 4;
+                else if (noise < 0.3) tileId = 3;
+                else if (noise2 > 0.7) tileId = 9;
+                else if (noise2 > 0.55) tileId = 1;
+                else if (noise2 < 0.25) tileId = 2;
+                else tileId = 0;
+                
+                this.renderTile(screenPos.x, screenPos.y, tileSize, tileId);
+            }
+        }
+    }
+
+    simplexNoise(x, y) {
+        const n = Math.sin(x * 0.05) * 0.5 + Math.cos(y * 0.07) * 0.3 + Math.sin((x + y) * 0.03) * 0.2;
+        return (n + 1) / 2;
     }
 
     renderChunkEntities(chunk) {
@@ -535,71 +621,32 @@ class MapRenderer {
             
             let color = '#00d4ff';
             let size = 16;
+            let icon = '👤';
             
             if (entityType === 'npc') {
                 color = '#f59e0b';
-                size = 14;
+                icon = '🧙';
             } else if (entityType === 'monster') {
                 color = '#ef4444';
-                size = 12;
+                icon = '👹';
             } else if (entityType === 'treasure') {
                 color = '#fbbf24';
-                size = 10;
+                icon = '📦';
             } else if (entityType === 'portal') {
                 color = '#a855f7';
-                size = 16;
+                icon = '🌀';
             }
 
             this.ctx.fillStyle = color;
-            this.ctx.beginPath();
-            this.ctx.arc(screenPos.x, screenPos.y, size, 0, Math.PI * 2);
-            this.ctx.fill();
+            this.ctx.font = `${size}px serif`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(icon, screenPos.x, screenPos.y);
 
             this.ctx.shadowColor = color;
             this.ctx.shadowBlur = size * 2;
-            this.ctx.beginPath();
-            this.ctx.arc(screenPos.x, screenPos.y, size, 0, Math.PI * 2);
-            this.ctx.fill();
+            this.ctx.fillText(icon, screenPos.x, screenPos.y);
             this.ctx.shadowBlur = 0;
-
-            const scale = this.engine.viewport.getScale();
-            
-            if (entity.type === 'monster') {
-                const healthBarWidth = 40 * scale;
-                const healthBarHeight = 6 * scale;
-                const healthBarX = screenPos.x - healthBarWidth / 2;
-                const healthBarY = screenPos.y - size - 8;
-                
-                const health = entity.health || entity.Health || 100;
-                const maxHealth = entity.max_health || entity.MaxHealth || 100;
-                const healthPercent = Math.max(0, Math.min(1, health / maxHealth));
-                
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                this.ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-                
-                let healthColor = '#22c55e';
-                if (healthPercent < 0.3) {
-                    healthColor = '#ef4444';
-                } else if (healthPercent < 0.6) {
-                    healthColor = '#eab308';
-                }
-                
-                this.ctx.fillStyle = healthColor;
-                this.ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
-                
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                this.ctx.lineWidth = 1;
-                this.ctx.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-            }
-
-            if (entity.name) {
-                const nameOffset = entity.type === 'monster' ? size + 14 : size + 4;
-                this.ctx.font = `${10 * scale}px sans-serif`;
-                this.ctx.fillStyle = '#fff';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'bottom';
-                this.ctx.fillText(entity.name, screenPos.x, screenPos.y - nameOffset);
-            }
         }
     }
 
@@ -632,7 +679,6 @@ class MapRenderer {
             this.ctx.stroke();
         }
 
-        this.renderGridLabels(startX, endX, startY, endY, scale);
         this.renderChunkBorders(startX, endX, startY, endY, scale);
     }
 
@@ -659,40 +705,7 @@ class MapRenderer {
         }
     }
 
-    renderGridLabels(startX, endX, startY, endY, scale) {
-        this.ctx.font = `${10 * scale}px monospace`;
-        this.ctx.fillStyle = 'rgba(0, 212, 255, 0.6)';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'top';
-
-        const edgeOffset = 15 * scale;
-        const bottomY = this.canvas.height - edgeOffset;
-
-        for (let x = startX; x <= endX; x += this.gridSpacing) {
-            const screenX = (x - this.engine.viewport.centerX) * scale + this.canvas.width / 2;
-            
-            if (screenX > 30 * scale && screenX < this.canvas.width - 30 * scale) {
-                this.ctx.fillText(`${Math.floor(x)}`, screenX, bottomY);
-            }
-        }
-
-        this.ctx.textAlign = 'left';
-        this.ctx.textBaseline = 'middle';
-
-        const rightX = this.canvas.width - edgeOffset;
-
-        for (let y = startY; y <= endY; y += this.gridSpacing) {
-            const screenY = (y - this.engine.viewport.centerY) * scale + this.canvas.height / 2;
-            
-            if (screenY > 20 * scale && screenY < this.canvas.height - 20 * scale) {
-                this.ctx.fillText(`${Math.floor(y)}`, rightX, screenY);
-            }
-        }
-    }
-
     renderPlayer(worldPos) {
-        if (!this.canvas || !this.ctx) return;
-        
         const screenPos = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
         
         this.ctx.save();
@@ -701,9 +714,10 @@ class MapRenderer {
         this.ctx.shadowBlur = 25;
         
         this.ctx.fillStyle = '#22c55e';
-        this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, 12, 0, Math.PI * 2);
-        this.ctx.fill();
+        this.ctx.font = '24px serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('🧑', screenPos.x, screenPos.y);
         
         this.ctx.restore();
     }
@@ -722,7 +736,7 @@ class MapRenderer {
         this.ctx.restore();
     }
 
-    renderMiniMap() {
+    renderMiniMap(playerPos) {
         if (!this.miniMapEnabled || !this.canvas || !this.ctx) return;
         
         const size = this.miniMapSize;
@@ -739,19 +753,14 @@ class MapRenderer {
         this.ctx.lineWidth = 1;
         this.ctx.strokeRect(x, y, size, size);
         
-        const playerPos = this.engine.playerWorldPos;
         const chunkSize = this.engine.config.chunkSize;
-        
-        const centerChunkX = Math.floor(playerPos.x / chunkSize);
-        const centerChunkY = Math.floor(playerPos.y / chunkSize);
-        
         const miniMapScale = size / (chunkSize * 3);
         
         for (let dx = -1; dx <= 1; dx++) {
             for (let dy = -1; dy <= 1; dy++) {
-                const chunk = this.engine.chunkManager.getChunk({ x: centerChunkX + dx, y: centerChunkY + dy });
-                const chunkWorldX = (centerChunkX + dx) * chunkSize;
-                const chunkWorldY = (centerChunkY + dy) * chunkSize;
+                const chunk = this.engine.chunkManager.getChunk({ x: Math.floor(playerPos.x / chunkSize) + dx, y: Math.floor(playerPos.y / chunkSize) + dy });
+                const chunkWorldX = Math.floor(playerPos.x / chunkSize) * chunkSize + dx * chunkSize;
+                const chunkWorldY = Math.floor(playerPos.y / chunkSize) * chunkSize + dy * chunkSize;
                 
                 const miniX = x + (chunkWorldX - playerPos.x + chunkSize * 1.5) * miniMapScale;
                 const miniY = y + (chunkWorldY - playerPos.y + chunkSize * 1.5) * miniMapScale;
@@ -777,52 +786,6 @@ class MapRenderer {
         this.ctx.beginPath();
         this.ctx.arc(playerMiniX, playerMiniY, 4, 0, Math.PI * 2);
         this.ctx.fill();
-        
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -1; dy <= 1; dy++) {
-                const chunk = this.engine.chunkManager.getChunk({ x: centerChunkX + dx, y: centerChunkY + dy });
-                if (!chunk || !chunk.entities) continue;
-                
-                for (const entity of chunk.entities) {
-                    let entType = entity.type || entity.EntityType;
-                    if (typeof entType === 'number') {
-                        switch(entType) {
-                            case 1: entType = 'monster'; break;
-                            case 2: entType = 'npc'; break;
-                            case 3: entType = 'treasure'; break;
-                        }
-                    }
-                    
-                    if (entType !== 'monster') continue;
-                    
-                    let entX = entity.x || entity.pos_x || entity.PosX;
-                    let entY = entity.y || entity.pos_y || entity.PosY;
-                    if (entity.Pos) {
-                        entX = entity.Pos.X || entity.Pos.x || entX;
-                        entY = entity.Pos.Y || entity.Pos.y || entY;
-                    }
-                    const entityMiniX = x + (entX - playerPos.x + chunkSize * 1.5) * miniMapScale;
-                    const entityMiniY = y + (entY - playerPos.y + chunkSize * 1.5) * miniMapScale;
-                    
-                    this.ctx.fillStyle = '#ef4444';
-                    this.ctx.beginPath();
-                    this.ctx.arc(entityMiniX, entityMiniY, 2.5, 0, Math.PI * 2);
-                    this.ctx.fill();
-                }
-            }
-        }
-        
-        const viewportHalfWidth = (this.canvas.width / 2) / this.engine.viewport.getScale();
-        const viewportHalfHeight = (this.canvas.height / 2) / this.engine.viewport.getScale();
-        
-        const viewportMiniX = x + (-viewportHalfWidth + chunkSize * 1.5) * miniMapScale;
-        const viewportMiniY = y + (-viewportHalfHeight + chunkSize * 1.5) * miniMapScale;
-        const viewportMiniWidth = (viewportHalfWidth * 2) * miniMapScale;
-        const viewportMiniHeight = (viewportHalfHeight * 2) * miniMapScale;
-        
-        this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.6)';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(viewportMiniX, viewportMiniY, viewportMiniWidth, viewportMiniHeight);
         
         this.ctx.fillStyle = '#fff';
         this.ctx.font = '10px sans-serif';

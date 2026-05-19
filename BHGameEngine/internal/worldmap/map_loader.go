@@ -3,6 +3,7 @@ package worldmap
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"sync"
@@ -11,6 +12,68 @@ import (
 	"github.com/openworld-server/pkg/snowflake"
 	"github.com/sirupsen/logrus"
 )
+
+// Perlin noise constants
+const (
+	noiseScale     = 0.01
+	octaves        = 4
+	persistence    = 0.5
+	lacunarity     = 2.0
+	seedMultiplier = 1000000
+)
+
+// noise2D generates 2D Perlin-like noise
+func noise2D(x, y, seed float64) float64 {
+	var total float64
+	var amplitude float64 = 1
+	var frequency float64 = 1
+	var maxValue float64 = 0
+
+	for i := 0; i < octaves; i++ {
+		total += interpolatedNoise(x*frequency+seed, y*frequency+seed) * amplitude
+		maxValue += amplitude
+		amplitude *= persistence
+		frequency *= lacunarity
+	}
+
+	return total / maxValue
+}
+
+func interpolatedNoise(x, y float64) float64 {
+	intX := int(math.Floor(x))
+	intY := int(math.Floor(y))
+	fracX := x - float64(intX)
+	fracY := y - float64(intY)
+
+	v1 := smoothNoise(intX, intY)
+	v2 := smoothNoise(intX+1, intY)
+	v3 := smoothNoise(intX, intY+1)
+	v4 := smoothNoise(intX+1, intY+1)
+
+	i1 := interpolate(v1, v2, fracX)
+	i2 := interpolate(v3, v4, fracX)
+
+	return interpolate(i1, i2, fracY)
+}
+
+func smoothNoise(x, y int) float64 {
+	corners := (noise(x-1, y-1) + noise(x+1, y-1) + noise(x-1, y+1) + noise(x+1, y+1)) / 16
+	sides := (noise(x-1, y) + noise(x+1, y) + noise(x, y-1) + noise(x, y+1)) / 8
+	center := noise(x, y) / 4
+	return corners + sides + center
+}
+
+func noise(x, y int) float64 {
+	n := int64(x)*9301 + int64(y)*49297 + 49297
+	n = (n << 13) ^ n
+	return 1.0 - float64((n*(n*n*15731+789221)+1376312589)&0x7fffffff)/1073741824.0
+}
+
+func interpolate(a, b, t float64) float64 {
+	ft := t * math.Pi
+	f := (1.0 - math.Cos(ft)) * 0.5
+	return a*(1.0-f) + b*f
+}
 
 type MapTile struct {
 	TileID     int32   // 瓦片ID
@@ -100,17 +163,60 @@ func (l *MapLoader) getChunkFilePath(chunkPos ChunkPos) string {
 
 func (l *MapLoader) GenerateDefaultChunk(chunkPos ChunkPos) *MapChunkData {
 	chunk := &MapChunkData{
-		ChunkPos: chunkPos,
-		Version:  1,
+		ChunkPos:  chunkPos,
+		Version:   1,
+		Timestamp: time.Now().Unix(),
 	}
+
+	seed := float64(chunkPos.X*seedMultiplier + chunkPos.Y)
 
 	for x := 0; x < ChunkSize; x++ {
 		for y := 0; y < ChunkSize; y++ {
+			worldX := float64(chunkPos.X*ChunkSize + x)
+			worldY := float64(chunkPos.Y*ChunkSize + y)
+
+			noiseVal := noise2D(worldX*noiseScale, worldY*noiseScale, seed)
+
+			var terrainType int32
+			var height float64
+			var walkable bool
+
+			if noiseVal < -0.2 {
+				terrainType = 4
+				height = 0
+				walkable = false
+			} else if noiseVal < -0.05 {
+				terrainType = 3
+				height = 0
+				walkable = true
+			} else if noiseVal < 0.1 {
+				terrainType = 0
+				height = 0
+				walkable = true
+			} else if noiseVal < 0.3 {
+				terrainType = 1
+				height = noiseVal * 10
+				walkable = true
+			} else if noiseVal < 0.5 {
+				terrainType = 1
+				height = noiseVal * 15
+				walkable = true
+			} else if noiseVal < 0.7 {
+				terrainType = 2
+				height = noiseVal * 20
+				walkable = true
+			} else {
+				terrainType = 5
+				height = noiseVal * 25
+				walkable = false
+			}
+
 			chunk.Tiles[x][y] = MapTile{
-				TileID:   int32(chunkPos.X*ChunkSize + x),
-				Terrain:  1,
-				Height:   0,
-				Walkable: true,
+				TileID:     int32(chunkPos.X*ChunkSize + x),
+				Terrain:    terrainType,
+				Height:     height,
+				Walkable:   walkable,
+				WaterLevel: 0,
 			}
 		}
 	}
