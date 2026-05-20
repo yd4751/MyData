@@ -1,0 +1,454 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+button {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+button:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+button:active {
+    transform: scale(0.98);
+    background: rgba(255,255,255,0.4);
+}
+
+button.danger {
+    background: rgba(239, 68, 68, 0.8);
+}
+
+button.danger:hover {
+    background: rgba(239, 68, 68, 1);
+}
+
+#breadcrumb {
+    background: white;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.crumb {
+    cursor: pointer;
+    color: #667eea;
+    font-size: 0.9rem;
+}
+
+.crumb:hover {
+    text-decoration: underline;
+}
+
+.crumb::after {
+    content: ' / ';
+    color: #ccc;
+    margin-left: 0.5rem;
+}
+
+.crumb:last-child::after {
+    content: '';
+}
+
+main {
+    padding: 1rem;
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 600px) {
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    header {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+        padding: 0.75rem;
+    }
+    
+    header h1 {
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.375rem;
+    }
+    
+    .header-actions button {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+        min-width: 70px;
+    }
+}
+
+.file-item {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid #eee;
+}
+
+.file-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.file-item.selected {
+    border-color: #667eea;
+    background: #f0f0ff;
+}
+
+.file-icon {
+    font-size: 3rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.file-name {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #333;
+    word-break: break-word;
+    margin-bottom: 0.25rem;
+}
+
+.file-info {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #999;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 400px;
+    border-radius: 12px;
+    position: relative;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-content h3 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-content textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    min-height: 150px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+@media (max-width: 600px) {
+    .modal-content {
+        margin: 10% auto;
+        width: 95%;
+        max-width: none;
+        padding: 1rem;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .modal-content textarea {
+        min-height: 200px;
+        font-size: 1.1rem;
+        padding: 0.875rem;
+    }
+    
+    .modal-content input {
+        font-size: 1.1rem;
+        padding: 0.875rem;
+    }
+    
+    .modal-actions button {
+        padding: 0.875rem;
+        font-size: 1.1rem;
+    }
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.modal-actions button {
+    background: #667eea;
+    border: none;
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.modal-actions button:hover {
+    background: #5a6fd6;
+}
+
+.modal-actions button:last-child {
+    background: #9ca3af;
+}
+
+.modal-actions button:last-child:hover {
+    background: #6b7280;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #999;
+}
+
+.empty-state .icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.context-menu {
+    position: absolute;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 0.5rem 0;
+    min-width: 160px;
+    z-index: 2000;
+}
+
+.context-menu button {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.context-menu button:hover {
+    background: #f5f5f5;
+}
+
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .mobile-only {
+        display: block;
+    }
+}
+
+.mobile-menu {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.mobile-menu-content {
+    background-color: white;
+    width: 90%;
+    max-width: 320px;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.mobile-menu-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.mobile-menu-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.mobile-menu-info {
+    font-size: 0.9rem;
+    color: #999;
+    margin-bottom: 1.5rem;
+}
+
+.mobile-menu-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.mobile-menu-btn {
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-btn.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.mobile-menu-btn.primary:hover {
+    opacity: 0.9;
+}
+
+.mobile-menu-btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.mobile-menu-btn.danger:hover {
+    background: #dc2626;
+}
+
+.batch-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.batch-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.batch-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.batch-btn.danger {
+    background: rgba(239, 68, 68, 0.8);
+    border-color: rgba(239, 68, 68, 1);
+}
+
+.batch-btn.danger:hover {
+    background: rgba(239, 68, 68, 1);
+}
+
+.batch-count {
+    color: white;
+    font-size: 0.9rem;
+    flex: 1;
+    text-align: center;
+}
