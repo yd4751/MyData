@@ -4,3 +4,5 @@ time="2026-05-19 06:29:23.756" level=info msg="Cross server network server start
 time="2026-05-19 06:29:23.757" level=info msg="Network server started on :7065"
 time="2026-05-19 06:29:25.743" level=warning msg="Failed to discover webserver for log forwarding, retrying in 5s..."
 time="2026-05-19 06:29:30.747" level=info msg="Log server set to: :7070"
+time="2026-05-19 11:44:44.058" level=info msg="Shutting down cross server..."
+time="2026-05-19 11:44:44.058" level=info msg="Network server stopped"
