@@ -4,3 +4,5 @@ BHGameEngine/bin/*
 BHGameEngine/logs/*
 NewsStation/frontend/node_modules/*
 Spider/taobao/venv/*
+Captcha/venv/*
+Captcha/_pycache_/*
