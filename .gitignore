@@ -2,3 +2,4 @@
 MediaStation/media/*
 BHGameEngine/bin/*
 BHGameEngine/logs/*
+NewsStation/frontend/node_modules/*
