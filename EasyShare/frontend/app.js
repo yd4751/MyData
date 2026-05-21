@@ -3,6 +3,7 @@ let selectedItems = [];
 let eventSource = null;
 let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 let isBatchMode = false;
+let currentFile = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadFiles(currentPath);
@@ -42,21 +43,35 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('deleteBtn').addEventListener('click', deleteSelectedFiles);
     
     document.getElementById('confirmMkdir').addEventListener('click', createDirectory);
+    document.getElementById('cancelMkdir').addEventListener('click', hideMkdirModal);
+    document.getElementById('mkdirModalClose').addEventListener('click', hideMkdirModal);
     
-    document.querySelector('.close').addEventListener('click', () => {
-        document.getElementById('mkdirModal').style.display = 'none';
+    document.getElementById('ctxDownload').addEventListener('click', () => {
+        if (currentFile) {
+            downloadFile(currentFile.path);
+            hideContextMenu();
+        }
+    });
+    
+    document.getElementById('ctxDelete').addEventListener('click', () => {
+        if (currentFile) {
+            deleteFile(currentFile.path);
+            hideContextMenu();
+        }
     });
     
     window.addEventListener('click', (e) => {
-        const modal = document.getElementById('mkdirModal');
-        if (e.target === modal) {
-            modal.style.display = 'none';
+        const mkdirModal = document.getElementById('mkdirModal');
+        if (e.target === mkdirModal) {
+            hideMkdirModal();
         }
         
-        const contextMenu = document.querySelector('.context-menu');
-        if (contextMenu && e.target !== contextMenu && !contextMenu.contains(e.target)) {
-            contextMenu.remove();
+        const pasteModal = document.getElementById('pasteModal');
+        if (e.target === pasteModal) {
+            hidePasteModal();
         }
+        
+        hideContextMenu();
         
         if (!e.target.closest('.file-item') && !e.target.closest('.context-menu')) {
             clearSelection();
@@ -74,10 +89,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     exitBatchMode();
                 } else {
                     clearSelection();
+                    hideMkdirModal();
+                    hidePasteModal();
+                    hideContextMenu();
                 }
             }
         });
     }
+    
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            const fileList = document.getElementById('fileList');
+            if (e.target.dataset.view === 'list') {
+                fileList.classList.add('list-view');
+            } else {
+                fileList.classList.remove('list-view');
+            }
+        });
+    });
 });
 
 function loadFiles(path) {
@@ -98,8 +130,9 @@ function displayFiles(files) {
     if (files.length === 0) {
         fileList.innerHTML = `
             <div class="empty-state">
-                <div class="icon">📭</div>
-                <p>空目录</p>
+                <div class="empty-icon">📭</div>
+                <div class="empty-title">空目录</div>
+                <div class="empty-desc">当前目录没有文件</div>
             </div>
         `;
         return;
@@ -113,8 +146,13 @@ function displayFiles(files) {
         
         fileItem.innerHTML = `
             <div class="file-icon">${file.isDir ? '📁' : getFileIcon(file.name)}</div>
-            <div class="file-name">${file.name}</div>
-            <div class="file-info">${file.isDir ? '文件夹' : formatSize(file.size)} · ${file.modTime}</div>
+            <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-meta">
+                    <span class="file-size">${file.isDir ? '📂' : formatSize(file.size)}</span>
+                    <span class="file-time">${file.modTime}</span>
+                </div>
+            </div>
         `;
         
         if (isMobile) {
@@ -144,11 +182,10 @@ function displayFiles(files) {
                     clearSelection();
                     toggleSelection(file.path, fileItem);
                 }
-                showContextMenu(e, file);
+                currentFile = file;
+                showContextMenu(e);
             });
         }
-        
-        
         
         fileList.appendChild(fileItem);
     });
@@ -186,21 +223,21 @@ function updateBreadcrumb(path) {
     const crumbs = path === '.' ? [] : path.split('/');
     let currentPath = '.';
     
-    const homeCrumb = document.createElement('span');
-    homeCrumb.className = 'crumb';
+    const homeCrumb = document.createElement('div');
+    homeCrumb.className = 'breadcrumb-item';
     homeCrumb.dataset.path = '.';
-    homeCrumb.textContent = '🏠 根目录';
+    homeCrumb.innerHTML = '<span class="crumb-icon">🏠</span><span class="crumb-text">根目录</span>';
     homeCrumb.addEventListener('click', () => loadFiles('.'));
     breadcrumb.appendChild(homeCrumb);
     
     crumbs.forEach(crumb => {
         currentPath = currentPath === '.' ? crumb : `${currentPath}/${crumb}`;
-        const span = document.createElement('span');
-        span.className = 'crumb';
-        span.dataset.path = currentPath;
-        span.textContent = crumb;
-        span.addEventListener('click', () => loadFiles(currentPath));
-        breadcrumb.appendChild(span);
+        const div = document.createElement('div');
+        div.className = 'breadcrumb-item';
+        div.dataset.path = currentPath;
+        div.innerHTML = `<span class="crumb-text">${crumb}</span>`;
+        div.addEventListener('click', () => loadFiles(currentPath));
+        breadcrumb.appendChild(div);
     });
 }
 
@@ -241,9 +278,17 @@ function createDirectory() {
         body: `path=${encodeURIComponent(path)}`
     }).then(() => {
         loadFiles(currentPath);
-        document.getElementById('mkdirModal').style.display = 'none';
-        document.getElementById('dirName').value = '';
+        hideMkdirModal();
     }).catch(error => console.error('Create dir error:', error));
+}
+
+function hideMkdirModal() {
+    document.getElementById('mkdirModal').style.display = 'none';
+    document.getElementById('dirName').value = '';
+}
+
+function hidePasteModal() {
+    document.getElementById('pasteModal').style.display = 'none';
 }
 
 function downloadFile(path) {
@@ -264,33 +309,15 @@ function deleteFile(path) {
     }).catch(error => console.error('Delete error:', error));
 }
 
-function showContextMenu(e, file) {
-    const existingMenu = document.querySelector('.context-menu');
-    if (existingMenu) existingMenu.remove();
-    
-    const menu = document.createElement('div');
-    menu.className = 'context-menu';
+function showContextMenu(e) {
+    const menu = document.getElementById('contextMenu');
     menu.style.left = `${e.pageX}px`;
     menu.style.top = `${e.pageY}px`;
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '⬇️ 下载';
-    downloadBtn.addEventListener('click', () => {
-        downloadFile(file.path);
-        menu.remove();
-    });
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.innerHTML = '🗑️ 删除';
-    deleteBtn.addEventListener('click', () => {
-        deleteFile(file.path);
-        menu.remove();
-    });
-    
-    menu.appendChild(downloadBtn);
-    menu.appendChild(deleteBtn);
-    
-    document.body.appendChild(menu);
+    menu.style.display = 'block';
+}
+
+function hideContextMenu() {
+    document.getElementById('contextMenu').style.display = 'none';
 }
 
 function showMobileMenu(e, file, fileItem) {
@@ -396,7 +423,7 @@ function enterBatchMode() {
     
     document.body.appendChild(batchBar);
     
-    document.querySelector('header').style.display = 'none';
+    document.querySelector('.app-header').style.display = 'none';
 }
 
 function exitBatchMode() {
@@ -406,7 +433,7 @@ function exitBatchMode() {
     const batchBar = document.getElementById('batchBar');
     if (batchBar) batchBar.remove();
     
-    document.querySelector('header').style.display = 'flex';
+    document.querySelector('.app-header').style.display = 'flex';
 }
 
 function selectAllFiles() {
@@ -433,8 +460,8 @@ function updateDeleteButton() {
     const btn = document.getElementById('deleteBtn');
     if (btn && !isMobile) {
         if (selectedItems.length > 0) {
-            btn.style.display = 'block';
-            btn.textContent = `🗑️ 删除选中 (${selectedItems.length})`;
+            btn.style.display = 'flex';
+            btn.innerHTML = `<span class="btn-icon">🗑️</span><span class="btn-text">删除选中 (${selectedItems.length})</span>`;
         } else {
             btn.style.display = 'none';
         }
@@ -465,16 +492,6 @@ function clearSelection() {
     updateDeleteButton();
 }
 
-function updateDeleteButton() {
-    const btn = document.getElementById('deleteBtn');
-    if (selectedItems.length > 0) {
-        btn.style.display = 'block';
-        btn.textContent = `🗑️ 删除选中 (${selectedItems.length})`;
-    } else {
-        btn.style.display = 'none';
-    }
-}
-
 function deleteSelectedFiles() {
     if (selectedItems.length === 0) return;
     
@@ -495,10 +512,6 @@ function deleteSelectedFiles() {
         loadFiles(currentPath);
         clearSelection();
     }).catch(error => console.error('Delete error:', error));
-}
-
-function hidePasteModal() {
-    document.getElementById('pasteModal').style.display = 'none';
 }
 
 function confirmPaste() {

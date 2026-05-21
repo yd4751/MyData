@@ -1,56 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Manager</title>
+    <title>密码管理</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div class="background"></div>
+    
     <div class="container">
-        <h1>Password Manager</h1>
-        
-        <div class="entry-form">
-            <h2>Add/Edit Entry</h2>
-            <form id="entryForm">
-	                <input type="text" id="title" placeholder="Title" required>
-	                <input type="text" id="username" placeholder="Username" required>
-		                <input type="text" id="password" placeholder="Password" required>
-	                <textarea id="remark" placeholder="Remark"></textarea>
-                <button type="submit">Save</button>
-            </form>
-        </div>
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-key"></i>
+                <span>密码管理</span>
+            </div>
+            <nav class="nav">
+                <button class="nav-btn active" data-tab="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>仪表盘</span>
+                </button>
+                <button class="nav-btn" data-tab="passwords">
+                    <i class="fas fa-lock"></i>
+                    <span>密码</span>
+                </button>
+                <button class="nav-btn" data-tab="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>设置</span>
+                </button>
+            </nav>
+        </header>
 
-        <div class="entry-list">
-            <h2>Password Entries</h2>
-            <table id="entriesTable">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Username</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Entries will be populated here -->
-                </tbody>
-            </table>
-        </div>
+        <main class="main-content">
+            <div class="left-panel">
+                <div class="password-input-card">
+                    <div class="glow-icon">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <form id="entryForm">
+                        <input type="text" id="title" placeholder="网站/标题" required>
+                        <input type="text" id="username" placeholder="用户名" required>
+                        <input type="password" id="password" placeholder="密码" required>
+                        <textarea id="remark" placeholder="备注"></textarea>
+                        <button type="submit" class="save-btn">保存</button>
+                    </form>
+                </div>
+            </div>
 
-        <div class="operation-logs">
-            <h2>Operation Logs</h2>
-            <table id="logsTable">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Operation</th>
-                        <th>Entry</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Logs will be populated here -->
-                </tbody>
-            </table>
+            <div class="right-panel">
+                <div class="tab-content" id="dashboard-tab">
+                    <div class="stats-card">
+                        <div class="stat-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <div>
+                                <span class="stat-value" id="totalEntries">0</span>
+                                <span class="stat-label">密码总数</span>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-plus-circle"></i>
+                            <div>
+                                <span class="stat-value" id="todayAdded">0</span>
+                                <span class="stat-label">今日新增</span>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-clock"></i>
+                            <div>
+                                <span class="stat-value" id="recentActivity">0</span>
+                                <span class="stat-label">最近活动</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-list-card">
+                        <h3>最近添加</h3>
+                        <div id="recentList" class="recent-list"></div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="passwords-tab" style="display: none;">
+                    <div class="password-table-card">
+                        <div class="table-header-row">
+                            <span class="table-col">标题</span>
+                            <span class="table-col">用户名</span>
+                            <span class="table-col">操作</span>
+                        </div>
+                        <div id="entriesTable" class="table-body"></div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="settings-tab" style="display: none;">
+                    <div class="settings-card">
+                        <h3>安全设置</h3>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox"> 启用双重认证
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox"> 自动锁定
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>自动锁定时间：</label>
+                            <select>
+                                <option>5分钟</option>
+                                <option>10分钟</option>
+                                <option>30分钟</option>
+                                <option>1小时</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div class="logs-section">
+            <h3>操作日志</h3>
+            <div id="logsContainer" class="logs-container"></div>
         </div>
     </div>
 

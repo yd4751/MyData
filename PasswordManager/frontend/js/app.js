@@ -1,63 +1,75 @@
-// DOM Elements
 const entryForm = document.getElementById('entryForm');
-const entriesTable = document.getElementById('entriesTable').querySelector('tbody');
-const logsTable = document.getElementById('logsTable').querySelector('tbody');
+const entriesTable = document.getElementById('entriesTable');
+const logsContainer = document.getElementById('logsContainer');
+const recentList = document.getElementById('recentList');
+const totalEntries = document.getElementById('totalEntries');
+const todayAdded = document.getElementById('todayAdded');
+const navBtns = document.querySelectorAll('.nav-btn');
 
-// Form inputs
 const titleInput = document.getElementById('title');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const remarkInput = document.getElementById('remark');
 
-// Sample data - will be replaced with API calls
 let entries = [];
 let logs = [];
 let currentEntryId = null;
 
-// Initialize the application
 function init() {
     loadEntries();
     loadLogs();
     setupEventListeners();
+    updateStats();
 }
 
-// Load password entries
 function loadEntries() {
-    // TODO: Replace with API call to /api/password_entries
     entries = [
-        {id: 1, title: 'Gmail', username: 'user1@gmail.com', password: 'encrypted1', remark: 'Personal account'},
-        {id: 2, title: 'GitHub', username: 'dev1', password: 'encrypted2', remark: 'Work account'}
+        { id: 1, title: 'Gmail', username: 'user1@gmail.com', password: 'encrypted1', remark: 'Personal account' },
+        { id: 2, title: 'GitHub', username: 'dev1', password: 'encrypted2', remark: 'Work account' },
+        { id: 3, title: 'example.com', username: 'user123', password: 'encrypted3', remark: '' },
+        { id: 4, title: 'secure-site.com', username: 'admin', password: 'encrypted4', remark: 'Admin account' }
     ];
     renderEntries();
+    renderRecentList();
 }
 
-// Load operation logs
 function loadLogs() {
-    // TODO: Replace with API call to /api/operation_logs
+    const now = new Date();
+    const formatTime = (date) => {
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+    
     logs = [
-        {id: 1, entry_id: 1, operation_type: 'add', operation_time: '2026-05-12 10:00', user_id: 1},
-        {id: 2, entry_id: 2, operation_type: 'add', operation_time: '2026-05-12 10:30', user_id: 1}
+        { id: 1, entry_id: 1, operation_type: 'add', operation_time: formatTime(new Date(now - 3600000)), user_id: 1 },
+        { id: 2, entry_id: 2, operation_type: 'add', operation_time: formatTime(new Date(now - 7200000)), user_id: 1 },
+        { id: 3, entry_id: 1, operation_type: 'update', operation_time: formatTime(new Date(now - 1800000)), user_id: 1 },
+        { id: 4, entry_id: 3, operation_type: 'add', operation_time: formatTime(new Date(now - 900000)), user_id: 1 }
     ];
     renderLogs();
 }
 
-// Render password entries to the table
 function renderEntries() {
     entriesTable.innerHTML = '';
     entries.forEach(entry => {
-        const row = document.createElement('tr');
+        const row = document.createElement('div');
+        row.className = 'table-row';
         row.innerHTML = `
-            <td>${entry.title}</td>
-            <td>${entry.username}</td>
-            <td>
-                <button class="edit-btn" data-id="${entry.id}">Edit</button>
-                <button class="delete-btn" data-id="${entry.id}">Delete</button>
-            </td>
+            <span>${entry.title}</span>
+            <span>${entry.username}</span>
+            <div class="table-actions">
+                <button class="edit-btn" data-id="${entry.id}">编辑</button>
+                <button class="delete-btn" data-id="${entry.id}">删除</button>
+            </div>
         `;
         entriesTable.appendChild(row);
     });
 
-    // Add event listeners to buttons
     document.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', handleEdit);
     });
@@ -66,22 +78,38 @@ function renderEntries() {
     });
 }
 
-// Render operation logs to the table
-function renderLogs() {
-    logsTable.innerHTML = '';
-    logs.forEach(log => {
-        const entry = entries.find(e => e.id === log.entry_id) || {title: 'Deleted Entry'};
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${log.operation_time}</td>
-            <td>${log.operation_type}</td>
-            <td>${entry.title}</td>
-        `;
-        logsTable.appendChild(row);
+function renderRecentList() {
+    recentList.innerHTML = '';
+    const recent = [...entries].reverse().slice(0, 5);
+    recent.forEach(entry => {
+        const item = document.createElement('div');
+        item.className = 'recent-item';
+        item.textContent = `${entry.title} - ${entry.username}`;
+        recentList.appendChild(item);
     });
 }
 
-// Handle form submission
+function renderLogs() {
+    logsContainer.innerHTML = '';
+    const sortedLogs = [...logs].reverse();
+    sortedLogs.forEach(log => {
+        const entry = entries.find(e => e.id === log.entry_id) || { title: 'Deleted Entry' };
+        const row = document.createElement('div');
+        row.className = 'log-item';
+        const typeText = {
+            'add': '添加',
+            'update': '更新',
+            'delete': '删除'
+        };
+        row.innerHTML = `
+            <span class="log-time">${log.operation_time}</span>
+            <span class="log-type ${log.operation_type}">${typeText[log.operation_type]}</span>
+            <span>${entry.title}</span>
+        `;
+        logsContainer.appendChild(row);
+    });
+}
+
 function handleSubmit(e) {
     e.preventDefault();
     
@@ -93,58 +121,68 @@ function handleSubmit(e) {
     };
 
     if (currentEntryId) {
-        // Update existing entry
         updateEntry(currentEntryId, entryData);
     } else {
-        // Create new entry
         createEntry(entryData);
     }
 
     resetForm();
 }
 
-// Create new password entry
 function createEntry(entryData) {
-    // TODO: Replace with API POST to /api/password_entries
     const newEntry = {
         id: entries.length > 0 ? Math.max(...entries.map(e => e.id)) + 1 : 1,
         ...entryData
     };
     entries.push(newEntry);
     renderEntries();
+    renderRecentList();
+    updateStats();
 
-    // Simulate log creation
+    const now = new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
     logs.push({
         id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
         entry_id: newEntry.id,
         operation_type: 'add',
-        operation_time: new Date().toISOString(),
-        user_id: 1 // TODO: Replace with actual user ID
+        operation_time: now,
+        user_id: 1
     });
     renderLogs();
 }
 
-// Update existing password entry
 function updateEntry(id, entryData) {
-    // TODO: Replace with API PUT to /api/password_entries/{id}
     const index = entries.findIndex(e => e.id === id);
     if (index !== -1) {
-        entries[index] = {id, ...entryData};
+        entries[index] = { id, ...entryData };
         renderEntries();
+        renderRecentList();
 
-        // Simulate log creation
+        const now = new Date().toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
         logs.push({
             id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
             entry_id: id,
             operation_type: 'update',
-            operation_time: new Date().toISOString(),
-            user_id: 1 // TODO: Replace with actual user ID
+            operation_time: now,
+            user_id: 1
         });
         renderLogs();
     }
 }
 
-// Handle edit button click
 function handleEdit(e) {
     const id = parseInt(e.target.dataset.id);
     const entry = entries.find(e => e.id === id);
@@ -157,44 +195,69 @@ function handleEdit(e) {
     }
 }
 
-// Handle delete button click
 function handleDelete(e) {
     const id = parseInt(e.target.dataset.id);
-    if (confirm('Are you sure you want to delete this entry?')) {
+    if (confirm('确定要删除这条记录吗？')) {
         deleteEntry(id);
     }
 }
 
-// Delete password entry
 function deleteEntry(id) {
-    // TODO: Replace with API DELETE to /api/password_entries/{id}
     const index = entries.findIndex(e => e.id === id);
     if (index !== -1) {
+        const deletedEntry = entries[index];
         entries.splice(index, 1);
         renderEntries();
+        renderRecentList();
+        updateStats();
 
-        // Simulate log creation
+        const now = new Date().toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
         logs.push({
             id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
             entry_id: id,
             operation_type: 'delete',
-            operation_time: new Date().toISOString(),
-            user_id: 1 // TODO: Replace with actual user ID
+            operation_time: now,
+            user_id: 1
         });
         renderLogs();
     }
 }
 
-// Reset form
 function resetForm() {
     currentEntryId = null;
     entryForm.reset();
 }
 
-// Set up event listeners
-function setupEventListeners() {
-    entryForm.addEventListener('submit', handleSubmit);
+function updateStats() {
+    totalEntries.textContent = entries.length;
+    todayAdded.textContent = logs.filter(log => log.operation_type === 'add').length;
 }
 
-// Initialize the app when DOM is loaded
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+    });
+    document.getElementById(`${tabName}-tab`).style.display = 'block';
+    
+    navBtns.forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+}
+
+function setupEventListeners() {
+    entryForm.addEventListener('submit', handleSubmit);
+    
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchTab(btn.dataset.tab);
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', init);

@@ -3,7 +3,6 @@ const apiBaseUrl = `${window.location.protocol}//${window.location.hostname}${wi
 let services = [];
 const servicesContainer = document.getElementById('services-container');
 
-// UI元素
 const addServiceBtn = document.getElementById('add-service-btn');
 const addServiceModal = document.getElementById('add-service-modal');
 const addServiceForm = document.getElementById('add-service-form');
@@ -13,13 +12,11 @@ const jsonFileInput = document.getElementById('json-file');
 const jsonInput = document.getElementById('json-input');
 const submitImportBtn = document.getElementById('submit-import');
 
-// 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
     fetchServices();
     setupEventListeners();
 });
 
-// 获取服务列表
 async function fetchServices() {
     try {
         const response = await fetch(`${apiBaseUrl}/services`);
@@ -27,77 +24,115 @@ async function fetchServices() {
         renderServices();
     } catch (error) {
         console.error('获取服务列表失败:', error);
+        renderEmptyState();
     }
 }
 
-// 渲染服务卡片
 function renderServices() {
+    if (!services || services.length === 0) {
+        renderEmptyState();
+        return;
+    }
+
     servicesContainer.innerHTML = '';
     services.forEach(service => {
         const card = document.createElement('div');
         card.className = `service-card ${service.status}`;
         card.innerHTML = `
             <div class="card-header">
-                <h3>${service.name}</h3>
+                <div class="card-title">
+                    <h3>${service.name}</h3>
+                    <p>ID: ${service.id}</p>
+                </div>
                 <span class="status-badge ${service.status}">${service.status === 'running' ? '运行中' : '已停止'}</span>
             </div>
             <div class="card-body">
-                <p><strong>启动时间:</strong> ${service.startTime?.Valid ? new Date(service.startTime.Time).toLocaleString('zh-CN') : '-'}</p>
-                <p><strong>运行时长:</strong> ${service.uptime?.Valid ? service.uptime.String : '-'}</p>
-                <p><strong>命令:</strong> ${service.command}</p>
-                ${service.url ? `<p><strong>URL:</strong> <a href="${service.url}" target="_blank">${service.url}</a></p>` : ''}
+                <div class="info-row">
+                    <div class="info-icon">🕐</div>
+                    <div class="info-content">
+                        <div class="info-label">启动时间</div>
+                        <div class="info-value">${service.startTime?.Valid ? new Date(service.startTime.Time).toLocaleString('zh-CN') : '-'}</div>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon">⏱️</div>
+                    <div class="info-content">
+                        <div class="info-label">运行时长</div>
+                        <div class="info-value">${service.uptime?.Valid ? service.uptime.String : '-'}</div>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-icon">📝</div>
+                    <div class="info-content">
+                        <div class="info-label">命令</div>
+                        <div class="info-value">${service.command}</div>
+                    </div>
+                </div>
+                ${service.url ? `
+                <div class="info-row">
+                    <div class="info-icon">🌐</div>
+                    <div class="info-content">
+                        <div class="info-label">URL</div>
+                        <div class="info-value"><a href="${service.url}" target="_blank">${service.url}</a></div>
+                    </div>
+                </div>
+                ` : ''}
             </div>
-            <div class="actions">
-                <button class="button ${service.status === 'running' ? 'stop-btn' : 'start-btn'}" data-id="${service.id}">
-                    ${service.status === 'running' ? '停止' : '启动'}
+            <div class="card-actions">
+                <button class="card-button ${service.status === 'running' ? 'stop-btn' : 'start-btn'}" data-id="${service.id}">
+                    ${service.status === 'running' ? '⏹ 停止' : '▶ 启动'}
                 </button>
-                <button class="button edit-btn" data-id="${service.id}">编辑</button>
-                <button class="button delete-btn" data-id="${service.id}">删除</button>
+                <button class="card-button edit-btn" data-id="${service.id}">✏️ 编辑</button>
+                <button class="card-button delete-btn" data-id="${service.id}">🗑️ 删除</button>
             </div>
         `;
-        
-        // 添加卡片点击事件
+
         card.addEventListener('click', (e) => {
-            // 如果点击的是按钮，则不显示详情
-            if (e.target.tagName === 'BUTTON') return;
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
             showServiceDetails(service);
         });
-        
+
         servicesContainer.appendChild(card);
     });
 }
 
-// 显示服务详情
+function renderEmptyState() {
+    servicesContainer.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <h3>暂无服务</h3>
+            <p>点击上方"添加服务"按钮创建您的第一个服务</p>
+        </div>
+    `;
+}
+
 function showServiceDetails(service) {
     const modal = document.getElementById('service-modal');
     const modalContent = document.getElementById('modal-content');
     const modalTitle = document.getElementById('modal-title');
-    
+
     modalTitle.textContent = service.name;
     modalContent.innerHTML = `
         <div class="service-details">
-            <p><strong>服务ID:</strong> ${service.id}</p>
+            <p><strong>服务ID:</strong> <span>${service.id}</span></p>
             <p><strong>状态:</strong> <span class="status-badge ${service.status}">${service.status === 'running' ? '运行中' : '已停止'}</span></p>
-            <p><strong>启动时间:</strong> ${service.startTime?.Valid ? new Date(service.startTime.Time).toLocaleString('zh-CN') : '-'}</p>
-            <p><strong>运行时长:</strong> ${service.uptime?.Valid ? service.uptime.String : '-'}</p>
-            <p><strong>命令:</strong> ${service.command}</p>
-            ${service.url ? `<p><strong>URL:</strong> <a href="${service.url}" target="_blank">${service.url}</a></p>` : ''}
-            <p><strong>创建时间:</strong> ${new Date(service.createdAt).toLocaleString('zh-CN')}</p>
-            ${service.updatedAt ? `<p><strong>更新时间:</strong> ${new Date(service.updatedAt).toLocaleString('zh-CN')}</p>` : ''}
+            <p><strong>启动时间:</strong> <span>${service.startTime?.Valid ? new Date(service.startTime.Time).toLocaleString('zh-CN') : '-'}</span></p>
+            <p><strong>运行时长:</strong> <span>${service.uptime?.Valid ? service.uptime.String : '-'}</span></p>
+            <p><strong>启动命令:</strong> <span>${service.command}</span></p>
+            ${service.url ? `<p><strong>访问地址:</strong> <a href="${service.url}" target="_blank">${service.url}</a></p>` : ''}
+            <p><strong>创建时间:</strong> <span>${new Date(service.createdAt).toLocaleString('zh-CN')}</span></p>
+            ${service.updatedAt ? `<p><strong>更新时间:</strong> <span>${new Date(service.updatedAt).toLocaleString('zh-CN')}</span></p>` : ''}
         </div>
     `;
-    
-    modal.style.display = 'block';
-    
-    // 添加关闭按钮事件
+
+    modal.style.display = 'flex';
+
     document.querySelector('#service-modal .close').addEventListener('click', () => {
         modal.style.display = 'none';
     });
 }
 
-// 设置事件监听器
 function setupEventListeners() {
-    // 关闭模态框
     document.querySelectorAll('.close').forEach(closeBtn => {
         closeBtn.addEventListener('click', () => {
             document.querySelectorAll('.modal').forEach(modal => {
@@ -106,7 +141,6 @@ function setupEventListeners() {
         });
     });
 
-    // 点击模态框外部关闭
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -115,32 +149,33 @@ function setupEventListeners() {
         });
     });
 
-    // 委托处理按钮点击
     servicesContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('start-btn')) {
-            startService(e.target.dataset.id);
-        } else if (e.target.classList.contains('stop-btn')) {
-            stopService(e.target.dataset.id);
-        } else if (e.target.classList.contains('delete-btn')) {
+        const button = e.target.closest('button');
+        if (!button) return;
+
+        const serviceId = button.dataset.id;
+
+        if (button.classList.contains('start-btn')) {
+            startService(serviceId);
+        } else if (button.classList.contains('stop-btn')) {
+            stopService(serviceId);
+        } else if (button.classList.contains('delete-btn')) {
             if (confirm('确定要删除此服务吗？')) {
-                deleteService(e.target.dataset.id);
+                deleteService(serviceId);
             }
-        } else if (e.target.classList.contains('edit-btn')) {
-            editService(e.target.dataset.id);
+        } else if (button.classList.contains('edit-btn')) {
+            editService(serviceId);
         }
     });
 
-    // 添加服务按钮
     addServiceBtn.addEventListener('click', () => {
-        addServiceModal.style.display = 'block';
+        addServiceModal.style.display = 'flex';
     });
 
-    // 导入服务按钮
     importServicesBtn.addEventListener('click', () => {
-        importServiceModal.style.display = 'block';
+        importServiceModal.style.display = 'flex';
     });
 
-    // 表单提交
     addServiceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('service-name').value;
@@ -151,21 +186,19 @@ function setupEventListeners() {
             await createService({ name, command, url });
             addServiceModal.style.display = 'none';
             addServiceForm.reset();
-            fetchServices(); // 刷新服务列表
+            fetchServices();
         } catch (error) {
             console.error('创建服务失败:', error);
+            alert('创建服务失败: ' + error.message);
         }
     });
 
-    // 文件上传处理
     jsonFileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
             try {
                 const content = await readFileAsText(file);
-                console.log('文件内容:', content);
                 jsonInput.value = content;
-                console.log('jsonInput值已设置');
             } catch (error) {
                 console.error('读取文件失败:', error);
                 alert('读取文件失败，请检查文件格式');
@@ -173,7 +206,6 @@ function setupEventListeners() {
         }
     });
 
-    // 导入提交
     submitImportBtn.addEventListener('click', async () => {
         try {
             const json = jsonInput.value.trim();
@@ -181,13 +213,13 @@ function setupEventListeners() {
                 alert('请输入或上传JSON数据');
                 return;
             }
-            
+
             const result = await importServices(json);
             alert(`成功导入 ${result.count} 个服务`);
             importServiceModal.style.display = 'none';
             jsonFileInput.value = '';
             jsonInput.value = '';
-            fetchServices(); // 刷新服务列表
+            fetchServices();
         } catch (error) {
             alert(`导入失败: ${error.message}`);
             console.error('导入服务失败:', error);
@@ -195,7 +227,6 @@ function setupEventListeners() {
     });
 }
 
-// 读取文件为文本
 function readFileAsText(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -205,11 +236,10 @@ function readFileAsText(file) {
     });
 }
 
-// 导入服务
 async function importServices(json) {
     try {
-        const services = JSON.parse(json);
-        if (!Array.isArray(services)) {
+        const servicesData = JSON.parse(json);
+        if (!Array.isArray(servicesData)) {
             throw new Error('JSON数据必须是服务数组');
         }
 
@@ -225,7 +255,7 @@ async function importServices(json) {
             const errorData = await response.json();
             throw new Error(errorData.message || '导入失败');
         }
-        
+
         return await response.json();
     } catch (error) {
         console.error('导入服务失败:', error);
@@ -233,80 +263,99 @@ async function importServices(json) {
     }
 }
 
-// 创建服务
 async function createService(serviceData) {
     try {
-        await fetch(`${apiBaseUrl}/services`, {
+        const response = await fetch(`${apiBaseUrl}/services`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(serviceData)
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '创建失败');
+        }
     } catch (error) {
         console.error('创建服务失败:', error);
         throw error;
     }
 }
 
-// 启动服务
 async function startService(serviceId) {
     try {
         const service = services.find(s => s.id == serviceId);
-        
         if (!service) {
-            throw new Error('Service not found');
+            throw new Error('服务不存在');
         }
 
-        await fetch(`${apiBaseUrl}/services/start`, {
+        const response = await fetch(`${apiBaseUrl}/services/start`, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(service)
         });
-        fetchServices(); // 刷新服务列表
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '启动失败');
+        }
+
+        fetchServices();
     } catch (error) {
         console.error('启动服务失败:', error);
+        alert('启动服务失败: ' + error.message);
     }
 }
 
-// 停止服务
 async function stopService(serviceId) {
     try {
         const service = services.find(s => s.id == serviceId);
-        
         if (!service) {
-            throw new Error('Service not found');
+            throw new Error('服务不存在');
         }
 
-        await fetch(`${apiBaseUrl}/services/stop`, {
+        const response = await fetch(`${apiBaseUrl}/services/stop`, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(service)
         });
-        fetchServices(); // 刷新服务列表
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '停止失败');
+        }
+
+        fetchServices();
     } catch (error) {
         console.error('停止服务失败:', error);
+        alert('停止服务失败: ' + error.message);
     }
 }
 
-// 编辑服务
 async function editService(serviceId) {
     try {
-        // 获取服务详情
         const response = await fetch(`${apiBaseUrl}/services`);
-        const services = await response.json();
-        const service = services.find(s => s.id == serviceId);
-        
+        const servicesData = await response.json();
+        const service = servicesData.find(s => s.id == serviceId);
+
         if (!service) {
-            throw new Error('Service not found');
+            throw new Error('服务不存在');
         }
 
-        // 创建编辑表单模态框
         const editModal = document.createElement('div');
         editModal.className = 'modal';
         editModal.id = 'edit-service-modal';
         editModal.innerHTML = `
             <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>编辑服务</h2>
+                <div class="modal-header">
+                    <h2>编辑服务</h2>
+                    <span class="close">&times;</span>
+                </div>
                 <form id="edit-service-form">
                     <input type="hidden" id="edit-service-id" value="${service.id}">
                     <div class="form-group">
@@ -326,39 +375,37 @@ async function editService(serviceId) {
                     </div>
                     <div class="form-group">
                         <label for="edit-service-command">命令</label>
-                        <input type="text" id="edit-service-command" value="${service.command || ''}">
+                        <input type="text" id="edit-service-command" value="${service.command || ''}" required>
                     </div>
-                    <button type="submit">保存</button>
+                    <button type="submit" class="submit-btn">保存更改</button>
                 </form>
             </div>
         `;
 
         document.body.appendChild(editModal);
-        editModal.style.display = 'block';
+        editModal.style.display = 'flex';
 
-        // 关闭按钮事件
         editModal.querySelector('.close').addEventListener('click', () => {
             editModal.style.display = 'none';
             editModal.remove();
         });
 
-        // 表单提交
         document.getElementById('edit-service-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const serviceData = {
                 id: parseInt(document.getElementById('edit-service-id').value),
                 name: document.getElementById('edit-service-name').value,
                 status: document.getElementById('edit-service-status').value,
                 url: document.getElementById('edit-service-url').value || null,
-                command: document.getElementById('edit-service-command').value || null
+                command: document.getElementById('edit-service-command').value
             };
 
             try {
                 await updateService(serviceData);
                 editModal.style.display = 'none';
                 editModal.remove();
-                fetchServices(); // 刷新服务列表
+                fetchServices();
             } catch (error) {
                 console.error('编辑服务失败:', error);
                 alert('编辑服务失败: ' + error.message);
@@ -370,7 +417,6 @@ async function editService(serviceId) {
     }
 }
 
-// 更新服务
 async function updateService(serviceData) {
     try {
         const response = await fetch(`${apiBaseUrl}/services/edit`, {
@@ -391,14 +437,20 @@ async function updateService(serviceData) {
     }
 }
 
-// 删除服务
 async function deleteService(serviceId) {
     try {
-        await fetch(`${apiBaseUrl}/services/${serviceId}`, {
+        const response = await fetch(`${apiBaseUrl}/services/${serviceId}`, {
             method: 'DELETE'
         });
-        fetchServices(); // 刷新服务列表
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '删除失败');
+        }
+
+        fetchServices();
     } catch (error) {
         console.error('删除服务失败:', error);
+        alert('删除服务失败: ' + error.message);
     }
 }

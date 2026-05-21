@@ -1,7 +1,7 @@
 // Resource Station 前端JavaScript
 // 主要功能：用户认证、文件上传、资源管理
 
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api/v1`;
 let currentToken = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -20,6 +20,12 @@ const searchInput = document.getElementById('search-input');
 const refreshBtn = document.getElementById('refresh-btn');
 const uploadProgressCard = document.getElementById('upload-progress-card');
 const uploadProgress = document.getElementById('upload-progress');
+
+// 导航栏元素
+const homeNav = document.getElementById('home-nav');
+const categoryNav = document.getElementById('category-nav');
+const resourcesNav = document.getElementById('resources-nav');
+const settingsNav = document.getElementById('settings-nav');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -44,6 +50,12 @@ function initEventListeners() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);
     }
+
+    // 导航栏点击事件
+    if (homeNav) homeNav.addEventListener('click', () => setActiveNav(homeNav));
+    if (categoryNav) categoryNav.addEventListener('click', () => setActiveNav(categoryNav));
+    if (resourcesNav) resourcesNav.addEventListener('click', () => setActiveNav(resourcesNav));
+    if (settingsNav) settingsNav.addEventListener('click', () => setActiveNav(settingsNav));
 
     // 上传区域点击事件
     if (uploadArea) {
@@ -1000,6 +1012,14 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// 设置导航栏激活状态
+function setActiveNav(navElement) {
+    document.querySelectorAll('.navbar-nav .nav-link').forEach(nav => {
+        nav.classList.remove('active');
+    });
+    navElement.classList.add('active');
 }
 
 // 全局函数

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器监控</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">监控中心</span>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">
+                    <span class="nav-icon">🏠</span>
+                    <span>概览</span>
+                </button>
+                <button class="nav-item" data-tab="servers">
+                    <span class="nav-icon">🖥️</span>
+                    <span>服务器</span>
+                </button>
+                <button class="nav-item" data-tab="hardware">
+                    <span class="nav-icon">⚙️</span>
+                    <span>运控</span>
+                </button>
+                <button class="nav-item" data-tab="history">
+                    <span class="nav-icon">📊</span>
+                    <span>监控</span>
+                </button>
+                <button class="nav-item" data-tab="alerts">
+                    <span class="nav-icon">🔔</span>
+                    <span>警报</span>
+                </button>
+                <button class="nav-item" data-tab="processes">
+                    <span class="nav-icon">⚙️</span>
+                    <span>设置</span>
+                </button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <h1>系统监控仪表盘</h1>
+                <div class="header-right">
+                    <div class="status-badge online">
+                        <span class="status-dot"></span>
+                        <span>系统运行正常</span>
+                    </div>
+                </div>
+            </header>
+
+            <div id="dashboard" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card status-card">
+                        <div class="card-header">
+                            <span class="card-title">运行状态</span>
+                            <div class="card-divider orange"></div>
+                        </div>
+                        <div class="stat-value-large">
+                        <span id="running-count">1</span>
+                    </div>
+                    <div class="stat-status normal">
+                        <span class="status-indicator"></span>
+                        <span>正常</span>
+                    </div>
+                    </div>
+
+                    <div class="stat-card chart-card">
+                        <div class="card-header">
+                            <span class="card-title">服务器负载</span>
+                            <div class="card-divider cyan"></div>
+                        </div>
+                        <div class="chart-container-small">
+                            <canvas id="loadChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="stat-card resource-card">
+                        <div class="card-header">
+                            <span class="card-title">资源使用率</span>
+                            <div class="card-divider green"></div>
+                        </div>
+                        <div class="resource-bars">
+                            <div class="resource-item">
+                                <span class="resource-label">CPU</span>
+                                <div class="resource-bar">
+                                    <div class="bar-fill cpu" id="cpu-resource"></div>
+                                </div>
+                                <span class="resource-value" id="cpu-value">0%</span>
+                            </div>
+                            <div class="resource-item">
+                                <span class="resource-label">内存</span>
+                                <div class="resource-bar">
+                                    <div class="bar-fill memory" id="memory-resource"></div>
+                                </div>
+                                <span class="resource-value" id="memory-value">0%</span>
+                            </div>
+                            <div class="resource-item">
+                                <span class="resource-label">磁盘</span>
+                                <div class="resource-bar">
+                                    <div class="bar-fill disk" id="disk-resource"></div>
+                                </div>
+                                <span class="resource-value" id="disk-value">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card alert-card">
+                    <div class="card-header">
+                        <span class="card-title">警报信息</span>
+                        <div class="card-divider red"></div>
+                    </div>
+                    <div class="alert-content">
+                        <span class="alert-icon">✅</span>
+                        <span class="alert-text">暂无警报</span>
+                    </div>
+                </div>
+                </div>
+
+                <div class="info-section">
+                    <h2 class="section-title">实时状态</h2>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="info-icon-box cpu">
+                                <span>⚡</span>
+                            </div>
+                            <div class="info-body">
+                                <div class="info-label">CPU 使用率</div>
+                                <div class="info-value-row">
+                                    <span class="info-value" id="cpu-usage">0</span>
+                                    <span class="info-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-icon-box memory">
+                                <span>💾</span>
+                            </div>
+                            <div class="info-body">
+                                <div class="info-label">内存使用</div>
+                                <div class="info-value-row">
+                                    <span class="info-value" id="memory-usage">0</span>
+                                    <span class="info-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-icon-box disk">
+                                <span>📁</span>
+                            </div>
+                            <div class="info-body">
+                                <div class="info-label">磁盘空间</div>
+                                <div class="info-value-row">
+                                    <span class="info-value" id="disk-usage">0</span>
+                                    <span class="info-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-icon-box network">
+                                <span>🌐</span>
+                            </div>
+                            <div class="info-body">
+                                <div class="info-label">网络流量</div>
+                                <div class="info-value-row">
+                                    <span class="info-value" id="network-rate">0</span>
+                                    <span class="info-unit">KB/s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="servers" class="tab-content">
+                <h2 class="section-title">服务器列表</h2>
+                <div class="server-list" id="server-list"></div>
+            </div>
+
+            <div id="hardware" class="tab-content">
+                <h2 class="section-title">设备硬件配置</h2>
+                
+                <div class="hardware-section">
+                    <h3>🖥️ CPU 信息</h3>
+                    <div id="cpu-info" class="hardware-grid"></div>
+                </div>
+
+                <div class="hardware-section">
+                    <h3>💾 内存信息</h3>
+                    <div id="memory-info" class="hardware-card"></div>
+                </div>
+
+                <div class="hardware-section">
+                    <h3>📁 磁盘信息</h3>
+                    <div id="disk-info" class="hardware-grid"></div>
+                </div>
+
+                <div class="hardware-section">
+                    <h3>🌐 网络接口</h3>
+                    <div id="network-info" class="hardware-grid"></div>
+                </div>
+
+                <div class="hardware-section">
+                    <h3>🏷️ 主机信息</h3>
+                    <div id="host-info" class="hardware-card"></div>
+                </div>
+            </div>
+
+            <div id="history" class="tab-content">
+                <h2 class="section-title">历史数据图表</h2>
+                
+                <div class="history-controls">
+                    <div class="time-range">
+                        <button class="range-btn" data-range="24">24小时</button>
+                        <button class="range-btn active" data-range="168">7天</button>
+                        <button class="range-btn" data-range="720">30天</button>
+                    </div>
+                    <div class="metric-selector">
+                        <label>选择指标:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" name="metric" value="cpu" checked> CPU</label>
+                            <label><input type="checkbox" name="metric" value="memory" checked> 内存</label>
+                            <label><input type="checkbox" name="metric" value="disk" checked> 磁盘</label>
+                            <label><input type="checkbox" name="metric" value="network"> 网络</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container-large">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </div>
+
+            <div id="alerts" class="tab-content">
+                <h2 class="section-title">警报管理</h2>
+                <div class="alert-list" id="alert-list">
+                    <p class="empty-state">暂无警报信息</p>
+                </div>
+            </div>
+
+            <div id="processes" class="tab-content">
+                <h2 class="section-title">进程管理</h2>
+                
+                <div class="process-search">
+                    <input type="text" id="process-search-input" placeholder="搜索进程名、PID...">
+                    <button id="process-search-btn">搜索</button>
+                    <button id="refresh-processes">刷新</button>
+                </div>
+
+                <div class="process-stats">
+                    <span>Top 10 活跃进程 (按CPU使用率排序)</span>
+                </div>
+
+                <table class="process-table">
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>进程名</th>
+                            <th>CPU%</th>
+                            <th>内存%</th>
+                            <th>内存使用</th>
+                            <th>状态</th>
+                            <th>用户</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="process-list"></tbody>
+                </table>
+
+                <div id="process-detail-modal" class="modal">
+                    <div class="modal-content">
+                        <span class="close">&times;</span>
+                        <h3>进程详细信息</h3>
+                        <div id="process-detail-content"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

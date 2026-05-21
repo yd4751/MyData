@@ -8,472 +8,544 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary-color: #4361ee;
-            --primary-dark: #3a56d4;
-            --secondary-color: #7209b7;
-            --success-color: #4cc9f0;
-            --light-bg: #f8f9fa;
-            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            --card-shadow-hover: 0 15px 40px rgba(0, 0, 0, 0.12);
-            --transition: all 0.3s ease;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-blur: blur(20px);
+            --primary-glow: rgba(67, 97, 238, 0.5);
+            --success-color: #4ade80;
+            --warning-color: #f97316;
         }
-        
+
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e4e4e7;
+            overflow-x: hidden;
         }
-        
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 20% 20%, rgba(67, 97, 238, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
         .navbar {
-            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.08) !important;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 1rem 0;
         }
-        
+
+        .navbar-nav .nav-link {
+            color: #e4e4e7 !important;
+            font-weight: 500;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            margin: 0 4px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .navbar-nav .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff !important;
+        }
+
+        .navbar-nav .nav-link.active {
+            background: linear-gradient(135deg, rgba(67, 97, 238, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%);
+            color: #fff !important;
+        }
+
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
-            color: white !important;
+            color: #fff !important;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
+
         .navbar-brand i {
             font-size: 1.8rem;
+            filter: drop-shadow(0 0 8px rgba(67, 97, 238, 0.8));
         }
-        
+
         .container {
             max-width: 1400px;
         }
-        
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            transition: var(--transition);
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 60px 30px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
             overflow: hidden;
-            margin-bottom: 25px;
-            background: white;
         }
-        
-        .card:hover {
-            box-shadow: var(--card-shadow-hover);
-            transform: translateY(-5px);
+
+        .upload-area:hover {
+            border-color: rgba(67, 97, 238, 0.6);
+            background: rgba(67, 97, 238, 0.08);
+            transform: scale(1.02);
         }
-        
-        .card-header {
-            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            color: white;
-            border-radius: 16px 16px 0 0 !important;
-            padding: 1.2rem 1.5rem;
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(67, 97, 238, 0.2) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .upload-area:hover::before {
+            opacity: 1;
+        }
+
+        .upload-area i {
+            font-size: 80px;
+            color: rgba(67, 97, 238, 0.8);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 0 15px rgba(67, 97, 238, 0.6));
+        }
+
+        .upload-area:hover i {
+            color: #4361ee;
+            transform: translateY(-10px) scale(1.1);
+            filter: drop-shadow(0 0 25px rgba(67, 97, 238, 0.8));
+        }
+
+        .upload-area h5 {
+            color: #e4e4e7;
             font-weight: 600;
-            font-size: 1.1rem;
-            border: none;
+            margin-bottom: 10px;
+            font-size: 1.25rem;
         }
-        
-        .card-header i {
-            margin-right: 10px;
+
+        .upload-area p {
+            color: #9ca3af;
+            font-size: 0.95rem;
         }
-        
-        .card-body {
-            padding: 1.8rem;
-        }
-        
+
         .btn-primary {
-            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            background: linear-gradient(135deg, #4361ee 0%, #7209b7 100%);
             border: none;
-            border-radius: 10px;
-            padding: 12px 24px;
+            border-radius: 12px;
+            padding: 12px 28px;
             font-weight: 600;
-            transition: var(--transition);
-            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(67, 97, 238, 0.4);
         }
-        
+
         .btn-primary:hover {
-            background: linear-gradient(90deg, var(--primary-dark) 0%, #5a08a1 100%);
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.4);
+            box-shadow: 0 8px 30px rgba(67, 97, 238, 0.6);
         }
-        
+
         .btn-outline-primary {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-            border-radius: 10px;
-            transition: var(--transition);
+            border-color: rgba(67, 97, 238, 0.6);
+            color: #4361ee;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: transparent;
         }
-        
+
         .btn-outline-primary:hover {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
+            background: rgba(67, 97, 238, 0.1);
+            border-color: #4361ee;
             transform: translateY(-2px);
         }
-        
+
         .btn-outline-danger {
-            border-radius: 10px;
-            transition: var(--transition);
+            border-radius: 12px;
+            border-color: rgba(239, 68, 68, 0.6);
+            color: #ef4444;
+            transition: all 0.3s ease;
+            background: transparent;
         }
-        
+
         .btn-outline-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
             transform: translateY(-2px);
         }
-        
+
+        .btn-outline-light {
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #e4e4e7;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .btn-outline-light:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #fff;
+        }
+
         .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
             padding: 12px 16px;
-            transition: var(--transition);
+            color: #e4e4e7;
+            transition: all 0.3s ease;
         }
-        
+
         .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+            border-color: rgba(67, 97, 238, 0.6);
+            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.15);
+            background: rgba(255, 255, 255, 0.1);
         }
-        
+
+        .form-control::placeholder {
+            color: #6b7280;
+        }
+
         .form-label {
             font-weight: 600;
-            color: #495057;
+            color: #d1d5db;
             margin-bottom: 8px;
         }
-        
+
+        .form-check-input {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .form-check-input:checked {
+            background: #4361ee;
+            border-color: #4361ee;
+        }
+
         .nav-tabs .nav-link {
             border-radius: 10px 10px 0 0;
             font-weight: 500;
-            transition: var(--transition);
+            color: #9ca3af;
+            background: transparent;
+            border: none;
+            transition: all 0.3s ease;
         }
-        
+
         .nav-tabs .nav-link.active {
-            background-color: rgba(67, 97, 238, 0.1);
-            border-color: #dee2e6 #dee2e6 white;
-            color: var(--primary-color);
+            background: rgba(67, 97, 238, 0.15);
+            color: #4361ee;
             font-weight: 600;
+            border-bottom: 2px solid #4361ee;
         }
-        
-        .upload-area {
-            border: 3px dashed var(--primary-color);
-            border-radius: 16px;
-            padding: 60px 30px;
-            text-align: center;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            cursor: pointer;
-            margin-bottom: 25px;
-            transition: var(--transition);
-        }
-        
-        .upload-area:hover {
-            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-            border-color: var(--secondary-color);
-            transform: scale(1.01);
-        }
-        
-        .upload-area i {
-            font-size: 64px;
-            color: var(--primary-color);
-            margin-bottom: 20px;
-            transition: var(--transition);
-        }
-        
-        .upload-area:hover i {
-            color: var(--secondary-color);
-            transform: translateY(-5px);
-        }
-        
-        .upload-area h5 {
-            color: #343a40;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .upload-area p {
-            color: #6c757d;
-            font-size: 0.95rem;
-        }
-        
+
         .table {
-            border-collapse: separate;
-            border-spacing: 0;
+            background: transparent;
         }
-        
+
         .table thead th {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             font-weight: 600;
-            color: #495057;
+            color: #d1d5db;
             padding: 1rem;
         }
-        
+
         .table tbody td {
             padding: 1rem;
             vertical-align: middle;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
         }
-        
+
         .table tbody tr:hover {
-            background-color: rgba(67, 97, 238, 0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
-        
-        .table-hover tbody tr:hover {
-            transform: translateX(5px);
-            transition: var(--transition);
-        }
-        
+
         .pagination .page-link {
-            border-radius: 8px;
+            border-radius: 10px;
             margin: 0 4px;
             border: none;
-            color: var(--primary-color);
-            transition: var(--transition);
+            color: #9ca3af;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
         }
-        
+
         .pagination .page-link:hover {
-            background-color: rgba(67, 97, 238, 0.1);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
             transform: translateY(-2px);
         }
-        
+
         .pagination .page-item.active .page-link {
-            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            background: linear-gradient(135deg, #4361ee 0%, #7209b7 100%);
+            color: #fff;
             border: none;
         }
-        
+
         .progress {
             height: 12px;
             border-radius: 10px;
-            background-color: #e9ecef;
+            background: rgba(255, 255, 255, 0.1);
             overflow: hidden;
         }
-        
+
         .progress-bar {
-            background: linear-gradient(90deg, var(--success-color) 0%, #4895ef 100%);
+            background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
             border-radius: 10px;
         }
-        
+
         .modal-content {
-            border-radius: 16px;
-            border: none;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            background: rgba(30, 30, 50, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
         }
-        
+
         .modal-header {
-            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            color: white;
-            border-radius: 16px 16px 0 0;
-            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px 20px 0 0;
+            color: #fff;
         }
-        
+
         .modal-title {
             font-weight: 600;
         }
-        
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .badge-success {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .badge-warning {
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .badge-secondary {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
         .toast {
+            background: rgba(30, 30, 50, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
-        
-        .toast-header {
-            border-radius: 12px 12px 0 0;
+
+        .card-header {
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px 20px 0 0 !important;
+            padding: 1.2rem 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #e4e4e7;
         }
-        
+
+        .card-header i {
+            margin-right: 10px;
+            color: #4361ee;
+        }
+
+        .card-body {
+            padding: 1.8rem;
+        }
+
         .file-item {
-            border: 1px solid #e9ecef;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 15px;
             margin-bottom: 15px;
-            background: white;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
         }
-        
+
         .file-item:hover {
-            background-color: #f8f9fa;
-            border-color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(67, 97, 238, 0.4);
             transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
         }
-        
+
         .file-icon {
             font-size: 28px;
             margin-right: 15px;
-            color: var(--primary-color);
+            color: #4361ee;
         }
-        
+
         .file-info {
             flex: 1;
         }
-        
+
         .file-name {
             font-weight: 600;
-            color: #343a40;
+            color: #e4e4e7;
             margin-bottom: 5px;
         }
-        
+
         .file-meta {
             display: flex;
             gap: 15px;
-            color: #6c757d;
+            color: #9ca3af;
             font-size: 0.9rem;
         }
-        
+
         .login-container {
             max-width: 450px;
             margin: 80px auto;
             padding: 40px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: var(--card-shadow);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
-        
-        @media (max-width: 768px) {
-            .card-body {
-                padding: 1.2rem;
-            }
-            
-            .upload-area {
-                padding: 40px 20px;
-            }
-            
-            .upload-area i {
-                font-size: 48px;
-            }
-            
-            .navbar-brand {
-                font-size: 1.2rem;
-            }
-        }
-        
-        /* 动画效果 */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        
-        /* 加载动画 */
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-        }
-        
-        /* 自定义滚动条 */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, var(--primary-dark) 0%, #5a08a1 100%);
-        }
-        
-        /* 文件预览样式 */
+
         .file-preview-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
-        
+
         .file-preview-card {
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
             padding: 15px;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
         }
-        
+
         .file-preview-card:hover {
-            border-color: var(--primary-color);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            border-color: rgba(67, 97, 238, 0.5);
+            background: rgba(255, 255, 255, 0.08);
             transform: translateY(-3px);
         }
-        
+
         .file-preview-content {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
-        
+
         .file-preview-thumbnail-container {
             width: 120px;
             height: 120px;
-            border-radius: 8px;
-            background: #f8f9fa;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 12px;
             overflow: hidden;
-            border: 2px dashed #dee2e6;
+            border: 2px dashed rgba(255, 255, 255, 0.1);
         }
-        
+
         .file-preview-thumbnail {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
         }
-        
+
         .file-preview-icon {
             width: 120px;
             height: 120px;
-            border-radius: 8px;
-            background: #f8f9fa;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 12px;
-            border: 2px dashed #dee2e6;
+            border: 2px dashed rgba(255, 255, 255, 0.1);
             font-size: 48px;
-            color: var(--primary-color);
+            color: #4361ee;
         }
-        
+
         .file-preview-info {
             width: 100%;
         }
-        
+
         .file-preview-name {
             font-weight: 600;
-            color: #343a40;
+            color: #e4e4e7;
             margin-bottom: 8px;
             font-size: 0.95rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
         .file-preview-meta {
             display: flex;
             justify-content: space-between;
             font-size: 0.85rem;
-            color: #6c757d;
+            color: #9ca3af;
         }
-        
+
         .file-preview-type {
-            background: rgba(67, 97, 238, 0.1);
-            color: var(--primary-color);
+            background: rgba(67, 97, 238, 0.15);
+            color: #4361ee;
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 0.75rem;
         }
-        
+
         .file-preview-size {
-            color: #6c757d;
+            color: #9ca3af;
         }
-        
+
         .file-preview-remove {
             position: absolute;
             top: 8px;
@@ -487,52 +559,109 @@
             justify-content: center;
             font-size: 0.8rem;
             opacity: 0.7;
-            transition: var(--transition);
+            transition: all 0.3s ease;
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            color: #ef4444;
         }
-        
+
         .file-preview-remove:hover {
             opacity: 1;
             transform: scale(1.1);
+            background: rgba(239, 68, 68, 0.3);
         }
-        
+
+        .navbar-text {
+            color: #e4e4e7 !important;
+        }
+
         @media (max-width: 768px) {
+            .card-body {
+                padding: 1.2rem;
+            }
+
+            .upload-area {
+                padding: 40px 20px;
+            }
+
+            .upload-area i {
+                font-size: 56px;
+            }
+
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+
+            .navbar-nav .nav-link {
+                padding: 0.5rem 1rem;
+            }
+
             .file-preview-container {
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
                 gap: 10px;
             }
-            
+
             .file-preview-thumbnail-container,
             .file-preview-icon {
                 width: 100px;
                 height: 100px;
             }
-            
+
             .file-preview-icon {
                 font-size: 36px;
             }
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(67, 97, 238, 0.6) 0%, rgba(168, 85, 247, 0.6) 100%);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #4361ee 0%, #a855f7 100%);
+        }
     </style>
 </head>
 <body>
-    <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="#">
                 <i class="bi bi-cloud-arrow-up-fill"></i> 资源管理存储站
             </a>
+            <div class="navbar-nav" id="nav-items">
+                <a class="nav-link active" href="#" id="home-nav"><i class="bi bi-house"></i> 首页</a>
+                <a class="nav-link" href="#" id="category-nav"><i class="bi bi-grid-3x3"></i> 分类</a>
+                <a class="nav-link" href="#" id="resources-nav"><i class="bi bi-folder-open"></i> 我的资源</a>
+                <a class="nav-link" href="#" id="settings-nav"><i class="bi bi-gear"></i> 设置</a>
+            </div>
             <div class="navbar-nav ms-auto" id="auth-buttons">
-                <!-- 登录/注册按钮将由JavaScript动态生成 -->
             </div>
         </div>
     </nav>
 
-    <!-- 主要内容区域 -->
-    <div class="container mt-4" id="main-content">
-        <!-- 登录/注册表单 -->
+    <div class="container mt-6" id="main-content">
         <div id="auth-forms" class="d-none">
             <div class="row justify-content-center">
                 <div class="col-md-6">
-                    <div class="card">
+                    <div class="glass-card">
                         <div class="card-header">
                             <ul class="nav nav-tabs card-header-tabs" id="auth-tabs">
                                 <li class="nav-item">
@@ -545,7 +674,6 @@
                         </div>
                         <div class="card-body">
                             <div class="tab-content">
-                                <!-- 登录表单 -->
                                 <div class="tab-pane fade show active" id="login">
                                     <form id="login-form">
                                         <div class="mb-3">
@@ -559,7 +687,6 @@
                                         <button type="submit" class="btn btn-primary w-100">登录</button>
                                     </form>
                                 </div>
-                                <!-- 注册表单 -->
                                 <div class="tab-pane fade" id="register">
                                     <form id="register-form">
                                         <div class="mb-3">
@@ -584,18 +711,15 @@
             </div>
         </div>
 
-        <!-- 资源管理界面 -->
         <div id="resource-manager" class="d-none">
             <div class="row">
                 <div class="col-md-3">
-                    <!-- 用户信息侧边栏 -->
-                    <div class="card">
+                    <div class="glass-card">
                         <div class="card-header">
                             <i class="bi bi-person-circle"></i> 用户信息
                         </div>
                         <div class="card-body">
                             <div id="user-info">
-                                <!-- 用户信息将由JavaScript动态生成 -->
                             </div>
                             <button class="btn btn-outline-danger w-100 mt-3" id="logout-btn">
                                 <i class="bi bi-box-arrow-right"></i> 退出登录
@@ -603,16 +727,15 @@
                         </div>
                     </div>
 
-                    <!-- 上传面板 -->
-                    <div class="card mt-3">
+                    <div class="glass-card mt-3">
                         <div class="card-header">
                             <i class="bi bi-upload"></i> 上传文件
                         </div>
                         <div class="card-body">
                             <div class="upload-area" id="upload-area">
                                 <i class="bi bi-cloud-arrow-up"></i>
-                                <h5>拖放文件到此处或点击选择</h5>
-                                <p class="text-muted">支持文本、图片、视频、音频等文件</p>
+                                <h5>上传资源</h5>
+                                <p class="text-muted">拖放文件到此处或点击选择</p>
                                 <input type="file" id="file-input" class="d-none" multiple>
                             </div>
                             <div class="form-check mb-3">
@@ -643,8 +766,7 @@
                 </div>
 
                 <div class="col-md-9">
-                    <!-- 资源列表 -->
-                    <div class="card">
+                    <div class="glass-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-folder"></i> 我的资源</span>
                             <div>
@@ -656,7 +778,7 @@
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>文件名</th>
@@ -668,26 +790,22 @@
                                         </tr>
                                     </thead>
                                     <tbody id="resource-table">
-                                        <!-- 资源列表将由JavaScript动态生成 -->
                                     </tbody>
                                 </table>
                             </div>
                             <nav aria-label="资源分页">
                                 <ul class="pagination justify-content-center" id="pagination">
-                                    <!-- 分页将由JavaScript动态生成 -->
                                 </ul>
                             </nav>
                         </div>
                     </div>
 
-                    <!-- 上传进度 -->
-                    <div class="card mt-3" id="upload-progress-card" style="display: none;">
+                    <div class="glass-card mt-3" id="upload-progress-card" style="display: none;">
                         <div class="card-header">
                             <i class="bi bi-clock-history"></i> 上传进度
                         </div>
                         <div class="card-body">
                             <div id="upload-progress">
-                                <!-- 上传进度将由JavaScript动态生成 -->
                             </div>
                         </div>
                     </div>
@@ -696,7 +814,6 @@
         </div>
     </div>
 
-    <!-- 模态框 - 资源详情 -->
     <div class="modal fade" id="resource-modal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -705,10 +822,9 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="resource-details">
-                    <!-- 资源详情将由JavaScript动态生成 -->
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">关闭</button>
                     <button type="button" class="btn btn-primary" id="download-btn">
                         <i class="bi bi-download"></i> 下载
                     </button>
@@ -717,11 +833,8 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-
-    <!-- 自定义JS -->
     <script src="/static/js/app.js"></script>
 </body>
 </html>

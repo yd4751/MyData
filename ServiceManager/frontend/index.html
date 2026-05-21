@@ -5,55 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>服务管理平台</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="background-overlay"></div>
     <div class="container">
-        <div class="header animate__animated animate__fadeInDown">
-            <h1>服务管理平台</h1>
+        <header class="header">
+            <div class="header-left">
+                <div class="header-icon">⚙️</div>
+                <div class="header-title">
+                    <h1>服务管理平台</h1>
+                    <p>管理和监控您的所有服务</p>
+                </div>
+            </div>
             <div class="header-actions">
                 <button id="add-service-btn" class="button add-btn">
-                    <i class="icon-plus"></i> 添加服务
+                    <span class="icon icon-plus"></span> 添加服务
                 </button>
                 <button id="import-services-btn" class="button import-btn">
-                    <i class="icon-import"></i> 导入服务
+                    <span class="icon icon-upload"></span> 导入服务
                 </button>
             </div>
-        </div>
+        </header>
+        
         <div id="services-container" class="services-grid">
             <!-- 服务卡片将通过JS动态生成 -->
         </div>
+    </div>
 
-        <!-- 添加服务表单 -->
-        <div id="add-service-modal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
+    <div id="add-service-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h2>添加新服务</h2>
-                <form id="add-service-form">
-                    <div class="form-group">
-                        <label for="service-name">服务名称</label>
-                        <input type="text" id="service-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="service-command">启动命令</label>
-                        <input type="text" id="service-command" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="service-url">前端URL</label>
-                        <input type="url" id="service-url">
-                    </div>
-                    <button type="submit" class="button submit-btn">创建服务</button>
-                </form>
+                <span class="close">&times;</span>
             </div>
+            <form id="add-service-form">
+                <div class="form-group">
+                    <label for="service-name">服务名称</label>
+                    <input type="text" id="service-name" placeholder="输入服务名称" required>
+                </div>
+                <div class="form-group">
+                    <label for="service-command">启动命令</label>
+                    <input type="text" id="service-command" placeholder="输入启动命令" required>
+                </div>
+                <div class="form-group">
+                    <label for="service-url">前端URL</label>
+                    <input type="url" id="service-url" placeholder="输入服务访问地址">
+                </div>
+                <button type="submit" class="submit-btn">创建服务</button>
+            </form>
         </div>
     </div>
 
-    <!-- 导入服务模态框 -->
     <div id="import-service-modal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>批量导入服务</h2>
+            <div class="modal-header">
+                <h2>批量导入服务</h2>
+                <span class="close">&times;</span>
+            </div>
             <div class="import-options">
                 <div class="option">
                     <h3>上传JSON文件</h3>
@@ -81,14 +91,16 @@
                     </div>
                 </div>
             </div>
-            <button id="submit-import" class="button submit-btn">导入</button>
+            <button id="submit-import" class="submit-btn">导入服务</button>
         </div>
     </div>
 
     <div id="service-modal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="modal-title">服务详情</h2>
+            <div class="modal-header">
+                <h2 id="modal-title">服务详情</h2>
+                <span class="close">&times;</span>
+            </div>
             <div id="modal-content">
                 <!-- 详情内容将通过JS动态生成 -->
             </div>

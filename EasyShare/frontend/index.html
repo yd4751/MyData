@@ -5,51 +5,133 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EasyShare - 文件共享</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <h1>📁 EasyShare</h1>
-        <div class="header-actions">
-            <button id="uploadBtn">📤 上传文件</button>
-            <button id="mkdirBtn">📁 创建文件夹</button>
-            <button id="pasteBtn">📋 粘贴</button>
-            <button id="batchBtn" class="mobile-only">✓ 批量选择</button>
-            <button id="deleteBtn" class="danger" style="display: none;">🗑️ 删除选中 (0)</button>
-        </div>
-    </header>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">📤</div>
+                    <span class="logo-text">EasyShare</span>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <div class="nav-item active">
+                    <span class="nav-icon">📁</span>
+                    <span class="nav-text">文件</span>
+                </div>
+                <div class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">统计</span>
+                </div>
+                <div class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">设置</span>
+                </div>
+            </nav>
+            <div class="header-actions">
+                <button class="action-btn primary" id="uploadBtn">
+                    <span class="btn-icon">📤</span>
+                    <span class="btn-text">上传文件</span>
+                </button>
+                <button class="action-btn secondary" id="mkdirBtn">
+                    <span class="btn-icon">📁</span>
+                    <span class="btn-text">新建文件夹</span>
+                </button>
+                <button class="action-btn secondary" id="pasteBtn">
+                    <span class="btn-icon">📋</span>
+                    <span class="btn-text">粘贴</span>
+                </button>
+                <button class="action-btn danger" id="deleteBtn" style="display: none;">
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">删除选中 (0)</span>
+                </button>
+            </div>
+        </header>
 
-    <nav id="breadcrumb">
-        <span class="crumb" data-path=".">🏠 根目录</span>
-    </nav>
+        <nav id="breadcrumb" class="breadcrumb">
+            <div class="breadcrumb-item" data-path=".">
+                <span class="crumb-icon">🏠</span>
+                <span class="crumb-text">根目录</span>
+            </div>
+        </nav>
 
-    <main>
-        <div id="fileList" class="file-grid">
-            <!-- 文件列表将动态生成 -->
-        </div>
-    </main>
+        <main class="main-content">
+            <div class="toolbar">
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="grid">
+                        <span class="view-icon">▦</span>
+                    </button>
+                    <button class="view-btn" data-view="list">
+                        <span class="view-icon">☰</span>
+                    </button>
+                </div>
+                <div class="sort-options">
+                    <select class="sort-select">
+                        <option value="name">按名称排序</option>
+                        <option value="time">按时间排序</option>
+                        <option value="size">按大小排序</option>
+                    </select>
+                </div>
+                <button class="toolbar-btn mobile-only" id="batchBtn">
+                    <span class="toolbar-icon">✓</span>
+                    <span class="toolbar-text">批量选择</span>
+                </button>
+            </div>
+
+            <div id="fileList" class="file-grid">
+                <!-- 文件列表将动态生成 -->
+            </div>
+        </main>
+    </div>
 
     <input type="file" id="fileInput" multiple style="display: none;">
     
-    <div id="mkdirModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>创建文件夹</h3>
-            <input type="text" id="dirName" placeholder="输入文件夹名称">
-            <button id="confirmMkdir">确定</button>
+    <div id="mkdirModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title">📁 创建文件夹</h3>
+                <button class="modal-close" id="mkdirModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="dirName" class="modal-input" placeholder="输入文件夹名称">
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" id="cancelMkdir">取消</button>
+                <button class="modal-btn primary" id="confirmMkdir">确定</button>
+            </div>
         </div>
     </div>
 
-    <div id="pasteModal" class="modal">
-        <div class="modal-content">
-            <span class="close" id="pasteModalClose">&times;</span>
-            <h3>📋 粘贴内容</h3>
-            <input type="text" id="pasteFileName" placeholder="输入文件名（默认自动生成）">
-            <textarea id="pasteContent" placeholder="在此粘贴内容（按 Ctrl+V 或右键粘贴）"></textarea>
-            <div class="modal-actions">
-                <button id="confirmPaste">保存文件</button>
-                <button id="cancelPaste">取消</button>
+    <div id="pasteModal" class="modal-overlay">
+        <div class="modal-container large">
+            <div class="modal-header">
+                <h3 class="modal-title">📋 粘贴内容</h3>
+                <button class="modal-close" id="pasteModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="pasteFileName" class="modal-input" placeholder="输入文件名（默认自动生成）">
+                <textarea id="pasteContent" class="modal-textarea" placeholder="在此粘贴内容（按 Ctrl+V 或右键粘贴）"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" id="cancelPaste">取消</button>
+                <button class="modal-btn primary" id="confirmPaste">保存文件</button>
             </div>
         </div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <button class="context-item" id="ctxDownload">
+            <span class="ctx-icon">⬇️</span>
+            <span class="ctx-text">下载</span>
+        </button>
+        <button class="context-item" id="ctxDelete">
+            <span class="ctx-icon">🗑️</span>
+            <span class="ctx-text">删除</span>
+        </button>
     </div>
 
     <script src="app.js"></script>
