@@ -68,6 +68,10 @@ func initDB() {
 }
 
 func main() {
+	if err := loadConfig(); err != nil {
+		log.Fatal("Failed to load config:", err)
+	}
+
 	initDB()
 	defer db.Close()
 
@@ -107,10 +111,6 @@ func main() {
 		// Otherwise serve the static file
 		http.StripPrefix("/", fs).ServeHTTP(w, r)
 	})
-
-	if err := loadConfig(); err != nil {
-		log.Fatal("Failed to load config:", err)
-	}
 
 	log.Printf("Starting server on :%d", config.Backend.Port)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(config.Backend.Port), nil))

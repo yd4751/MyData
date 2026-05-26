@@ -15,6 +15,8 @@ let entries = [];
 let logs = [];
 let currentEntryId = null;
 
+const API_BASE = `${window.location.origin}/api`;
+
 function init() {
     loadEntries();
     loadLogs();
@@ -23,35 +25,51 @@ function init() {
 }
 
 function loadEntries() {
-    entries = [
-        { id: 1, title: 'Gmail', username: 'user1@gmail.com', password: 'encrypted1', remark: 'Personal account' },
-        { id: 2, title: 'GitHub', username: 'dev1', password: 'encrypted2', remark: 'Work account' },
-        { id: 3, title: 'example.com', username: 'user123', password: 'encrypted3', remark: '' },
-        { id: 4, title: 'secure-site.com', username: 'admin', password: 'encrypted4', remark: 'Admin account' }
-    ];
-    renderEntries();
-    renderRecentList();
+    fetch(`${API_BASE}/password_entries`)
+        .then(response => response.json())
+        .then(data => {
+            entries = data;
+            renderEntries();
+            renderRecentList();
+            updateStats();
+        })
+        .catch(error => {
+            console.error('Failed to load entries:', error);
+            entries = [];
+            renderEntries();
+            renderRecentList();
+            updateStats();
+        });
 }
 
 function loadLogs() {
-    const now = new Date();
-    const formatTime = (date) => {
-        return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
+    fetch(`${API_BASE}/operation_logs`)
+        .then(response => response.json())
+        .then(data => {
+            logs = data.map(log => ({
+                ...log,
+                operation_time: formatDateTime(log.operation_time)
+            }));
+            renderLogs();
+            updateStats();
+        })
+        .catch(error => {
+            console.error('Failed to load logs:', error);
+            logs = [];
+            renderLogs();
+            updateStats();
         });
-    };
-    
-    logs = [
-        { id: 1, entry_id: 1, operation_type: 'add', operation_time: formatTime(new Date(now - 3600000)), user_id: 1 },
-        { id: 2, entry_id: 2, operation_type: 'add', operation_time: formatTime(new Date(now - 7200000)), user_id: 1 },
-        { id: 3, entry_id: 1, operation_type: 'update', operation_time: formatTime(new Date(now - 1800000)), user_id: 1 },
-        { id: 4, entry_id: 3, operation_type: 'add', operation_time: formatTime(new Date(now - 900000)), user_id: 1 }
-    ];
-    renderLogs();
+}
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 function renderEntries() {
@@ -60,7 +78,7 @@ function renderEntries() {
         const row = document.createElement('div');
         row.className = 'table-row';
         row.innerHTML = `
-            <span>${entry.title}</span>
+            <span class="entry-title">${entry.title}</span>
             <span>${entry.username}</span>
             <div class="table-actions">
                 <button class="edit-btn" data-id="${entry.id}">编辑</button>
@@ -68,6 +86,18 @@ function renderEntries() {
             </div>
         `;
         entriesTable.appendChild(row);
+    });
+
+    document.querySelectorAll('.table-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (!e.target.closest('.table-actions')) {
+                const id = parseInt(row.querySelector('.edit-btn').dataset.id);
+                const entry = entries.find(e => e.id === id);
+                if (entry) {
+                    showEntryModal(entry);
+                }
+            }
+        });
     });
 
     document.querySelectorAll('.edit-btn').forEach(btn => {
@@ -85,6 +115,7 @@ function renderRecentList() {
         const item = document.createElement('div');
         item.className = 'recent-item';
         item.textContent = `${entry.title} - ${entry.username}`;
+        item.addEventListener('click', () => showEntryModal(entry));
         recentList.appendChild(item);
     });
 }
@@ -110,6 +141,54 @@ function renderLogs() {
     });
 }
 
+function showEntryModal(entry) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>${entry.title}</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-item">
+                    <label>网站/标题</label>
+                    <span>${entry.title}</span>
+                </div>
+                <div class="modal-item">
+                    <label>用户名</label>
+                    <span>${entry.username}</span>
+                </div>
+                <div class="modal-item">
+                    <label>密码</label>
+                    <span class="password-display">${entry.password}</span>
+                </div>
+                <div class="modal-item">
+                    <label>备注</label>
+                    <span>${entry.remark || '无'}</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-close-btn">关闭</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const closeModal = () => {
+        document.body.removeChild(modal);
+    };
+    
+    modal.querySelector('.modal-close').addEventListener('click', closeModal);
+    modal.querySelector('.modal-close-btn').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+}
+
 function handleSubmit(e) {
     e.preventDefault();
     
@@ -130,57 +209,46 @@ function handleSubmit(e) {
 }
 
 function createEntry(entryData) {
-    const newEntry = {
-        id: entries.length > 0 ? Math.max(...entries.map(e => e.id)) + 1 : 1,
-        ...entryData
-    };
-    entries.push(newEntry);
-    renderEntries();
-    renderRecentList();
-    updateStats();
-
-    const now = new Date().toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+    fetch(`${API_BASE}/password_entries`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(entryData)
+    })
+    .then(response => response.json())
+    .then(newEntry => {
+        entries.push(newEntry);
+        renderEntries();
+        renderRecentList();
+        loadLogs();
+    })
+    .catch(error => {
+        console.error('Failed to create entry:', error);
     });
-    
-    logs.push({
-        id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
-        entry_id: newEntry.id,
-        operation_type: 'add',
-        operation_time: now,
-        user_id: 1
-    });
-    renderLogs();
 }
 
 function updateEntry(id, entryData) {
-    const index = entries.findIndex(e => e.id === id);
-    if (index !== -1) {
-        entries[index] = { id, ...entryData };
-        renderEntries();
-        renderRecentList();
-
-        const now = new Date().toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        logs.push({
-            id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
-            entry_id: id,
-            operation_type: 'update',
-            operation_time: now,
-            user_id: 1
-        });
-        renderLogs();
-    }
+    fetch(`${API_BASE}/password_entries/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...entryData, id })
+    })
+    .then(response => response.json())
+    .then(updatedEntry => {
+        const index = entries.findIndex(e => e.id === id);
+        if (index !== -1) {
+            entries[index] = updatedEntry;
+            renderEntries();
+            renderRecentList();
+            loadLogs();
+        }
+    })
+    .catch(error => {
+        console.error('Failed to update entry:', error);
+    });
 }
 
 function handleEdit(e) {
@@ -203,31 +271,23 @@ function handleDelete(e) {
 }
 
 function deleteEntry(id) {
-    const index = entries.findIndex(e => e.id === id);
-    if (index !== -1) {
-        const deletedEntry = entries[index];
-        entries.splice(index, 1);
-        renderEntries();
-        renderRecentList();
-        updateStats();
-
-        const now = new Date().toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        logs.push({
-            id: logs.length > 0 ? Math.max(...logs.map(l => l.id)) + 1 : 1,
-            entry_id: id,
-            operation_type: 'delete',
-            operation_time: now,
-            user_id: 1
-        });
-        renderLogs();
-    }
+    fetch(`${API_BASE}/password_entries/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (response.ok) {
+            const index = entries.findIndex(e => e.id === id);
+            if (index !== -1) {
+                entries.splice(index, 1);
+                renderEntries();
+                renderRecentList();
+                loadLogs();
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Failed to delete entry:', error);
+    });
 }
 
 function resetForm() {

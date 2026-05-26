@@ -319,6 +319,18 @@ body {
     font-size: 14px;
 }
 
+.entry-title {
+    cursor: pointer;
+    color: #00d4ff;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 0.3s ease;
+}
+
+.entry-title:hover {
+    text-decoration-color: #00d4ff;
+}
+
 .table-actions {
     display: flex;
     gap: 8px;
@@ -448,6 +460,114 @@ body {
 
 .log-type.delete {
     color: #f87171;
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(26, 26, 46, 0.95);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 450px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h3 {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 24px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.modal-close:hover {
+    color: #fff;
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.modal-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.modal-item:last-child {
+    margin-bottom: 0;
+}
+
+.modal-item label {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 13px;
+}
+
+.modal-item span {
+    color: #fff;
+    font-size: 15px;
+    word-break: break-all;
+}
+
+.password-display {
+    font-family: 'Courier New', monospace;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 15px;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.modal-footer {
+    padding: 15px 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: right;
+}
+
+.modal-close-btn {
+    padding: 10px 25px;
+    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
 }
 
 @media (max-width: 768px) {
